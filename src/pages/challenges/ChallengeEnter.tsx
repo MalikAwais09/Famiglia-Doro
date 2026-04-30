@@ -37,12 +37,16 @@ export function ChallengeEnter() {
         const entry = await getMyEntry(challengeId);
         setHasEntered(!!entry);
       } catch (err) {
+        console.error('Error in ChallengeEnter load:', err);
         toast.error('Failed to load challenge details');
       } finally {
         setPageLoading(false);
       }
     }
-    if (challengeId) load();
+    if (challengeId) {
+      console.log('ChallengeEnter: loading data for', challengeId);
+      load();
+    }
   }, [challengeId]);
 
   if (pageLoading) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Loading...</p></Section></Container>;

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal';
 import { getChallengeById } from '@/lib/supabase/challenges';
 import { getMyEntry, withdrawEntry } from '@/lib/supabase/entries';
+import { getComments, postComment, type Comment } from '@/lib/supabase/comments';
 import { supabase } from '@/lib/supabase/client';
 import type { Challenge } from '@/lib/supabase/types';
 import { useWallet } from '@/context/WalletContext';
@@ -27,6 +28,8 @@ export function ChallengeDetail() {
   const [hasEntered, setHasEntered] = useState(false);
   const [sponsorOpen, setSponsorOpen] = useState(false);
   const [comment, setComment] = useState('');
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
@@ -48,8 +51,12 @@ export function ChallengeDetail() {
           setMyEntry(entry);
           setHasEntered(!!entry);
         }
-      } catch {
-        if (!cancelled) toast.error('Failed to load challenge');
+        // Fetch comments
+        const comms = await getComments(id!);
+        if (!cancelled) setComments(comms);
+      } catch (err) {
+        console.error('Error loading challenge:', err);
+        if (!cancelled) toast.error('Failed to load challenge details');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -143,13 +150,38 @@ export function ChallengeDetail() {
       case 'upcoming':
         return <Button disabled fullWidth>Registration opens soon</Button>;
       case 'entry_open':
-        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/enter`)}>{isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}</Button>;
+        return (
+          <Button 
+            fullWidth 
+            onClick={() => {
+              console.log('Navigating to enter challenge:', id);
+              navigate(`/challenges/${id}/enter`);
+            }}
+          >
+            {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
+          </Button>
+        );
       case 'voting':
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
       case 'completed':
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
       default:
         return null;
+    }
+  };
+
+  const handlePostComment = async () => {
+    if (!comment.trim() || !id) return;
+    setCommentsLoading(true);
+    try {
+      const newComment = await postComment(id, comment.trim());
+      setComments([...comments, newComment]);
+      setComment('');
+      toast.success('Comment posted');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to post comment');
+    } finally {
+      setCommentsLoading(false);
     }
   };
 
@@ -217,7 +249,7 @@ export function ChallengeDetail() {
                     <div key={i} className="flex items-center gap-3">
                       <div className={`w-2.5 h-2.5 rounded-full ${past ? 'bg-emerald-400' : 'bg-gray-600'}`} />
                       <span className="text-sm flex-1">{t.label}</span>
-                      <span className="text-xs text-[#9CA3AF]">{formatDate(t.date!)}</span>
+                      <span className="text-xs text-[#9CA3AF]">{formatDateTime(t.date!)}</span>
                     </div>
                   );
                 })}
@@ -240,24 +272,33 @@ export function ChallengeDetail() {
 
             {/* Comments */}
             <Card>
-              <h3 className="text-sm font-semibold mb-3">Comments</h3>
-              <div className="space-y-3 mb-4">
-                {[
-                  { name: 'Alex Rivera', text: "This looks amazing! Can't wait to participate.", time: '2h ago' },
-                  { name: 'Jordan Lee', text: 'The prize pool is impressive. Good luck everyone!', time: '5h ago' },
-                ].map((c, i) => (
-                  <div key={i} className="bg-[#161618] rounded-md p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium">{c.name}</span>
-                      <span className="text-xs text-[#6B7280]">{c.time}</span>
+              <h3 className="text-sm font-semibold mb-3">Comments ({comments.length})</h3>
+              <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                {comments.length === 0 ? (
+                  <p className="text-xs text-[#6B7280] italic">No comments yet. Be the first!</p>
+                ) : (
+                  comments.map((c) => (
+                    <div key={c.id} className="bg-[#161618] rounded-md p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {c.user?.avatar_url && <img src={c.user.avatar_url} className="w-4 h-4 rounded-full" alt="" />}
+                          <span className="text-xs font-medium">{c.user?.name || 'Anonymous'}</span>
+                        </div>
+                        <span className="text-[10px] text-[#6B7280]">{new Date(c.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs text-[#9CA3AF]">{c.content}</p>
                     </div>
-                    <p className="text-xs text-[#9CA3AF]">{c.text}</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               <div className="flex gap-2">
-                <Input placeholder="Add a comment..." value={comment} onChange={e => setComment(e.target.value)} />
-                <Button onClick={() => { setComment(''); toast.success('Comment posted'); }} disabled={!comment.trim()}>Post</Button>
+                <Input 
+                  placeholder="Add a comment..." 
+                  value={comment} 
+                  onChange={e => setComment(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+                />
+                <Button onClick={handlePostComment} loading={commentsLoading} disabled={!comment.trim()}>Post</Button>
               </div>
             </Card>
           </div>
