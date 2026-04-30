@@ -129,27 +129,58 @@ OTHER REGIONS: Certain features may be unavailable in your region. Check local l
   },
 };
 
-export function AgreementModal() {
-  const { currentAgreement, acceptAgreement, hideAgreement, hasAccepted } = useAgreement();
+interface AgreementModalProps {
+  open?: boolean;
+  onClose?: () => void;
+  onAgree?: () => void;
+  title?: string;
+  children?: React.ReactNode;
+}
+
+export function AgreementModal({ open, onClose, onAgree, title, children }: AgreementModalProps) {
+  const agreementCtx = useAgreement();
   const [agreed, setAgreed] = useState(false);
 
-  if (!currentAgreement || hasAccepted(currentAgreement)) return null;
-  const agreement = AGREEMENTS[currentAgreement];
-  if (!agreement) return null;
+  // If used via context (global singleton)
+  const isContextMode = !children;
+  
+  const visible = isContextMode ? !!agreementCtx.currentAgreement : open;
+  const modalTitle = isContextMode 
+    ? (agreementCtx.currentAgreement ? AGREEMENTS[agreementCtx.currentAgreement]?.title : '') 
+    : title;
+
+  const handleAgree = () => {
+    if (isContextMode && agreementCtx.currentAgreement) {
+      agreementCtx.acceptAgreement(agreementCtx.currentAgreement);
+    }
+    if (onAgree) onAgree();
+    setAgreed(false);
+  };
+
+  const handleClose = () => {
+    if (isContextMode) agreementCtx.hideAgreement();
+    if (onClose) onClose();
+  };
+
+  if (!visible) return null;
+  if (isContextMode && agreementCtx.currentAgreement && agreementCtx.hasAccepted(agreementCtx.currentAgreement)) return null;
 
   return (
-    <Modal open={!!currentAgreement} onClose={hideAgreement} title={agreement.title} maxWidth="max-w-xl">
+    <Modal open={visible} onClose={handleClose} title={modalTitle} maxWidth="max-w-xl">
       <div className="space-y-4">
         <div className="max-h-60 overflow-y-auto text-sm text-[#9CA3AF] leading-relaxed border border-[rgba(255,255,255,0.05)] rounded-md p-4 bg-[#161618] whitespace-pre-line">
-          {agreement.content}
+          {isContextMode && agreementCtx.currentAgreement 
+            ? AGREEMENTS[agreementCtx.currentAgreement]?.content 
+            : children
+          }
         </div>
         <label className="flex items-start gap-2 cursor-pointer">
           <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 accent-yellow-600" />
-          <span className="text-sm">I have read and agree to the {agreement.title.toLowerCase()}</span>
+          <span className="text-sm">I have read and agree to the {(modalTitle || 'Agreement').toLowerCase()}</span>
         </label>
         <div className="flex gap-3">
-          <Button variant="secondary" fullWidth onClick={hideAgreement}>Decline</Button>
-          <Button fullWidth disabled={!agreed} onClick={() => { acceptAgreement(currentAgreement); setAgreed(false); }}>I Agree</Button>
+          <Button variant="secondary" fullWidth onClick={handleClose}>Decline</Button>
+          <Button fullWidth disabled={!agreed} onClick={handleAgree}>I Agree</Button>
         </div>
       </div>
     </Modal>

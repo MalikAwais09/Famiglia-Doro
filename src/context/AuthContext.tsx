@@ -50,13 +50,21 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 // ── Helper: fetch profile from DB ─────────────────────────────────────────
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  if (error) return null;
-  return data as UserProfile;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (error) {
+      console.warn('Profile fetch error (might not exist yet):', error.message);
+      return null;
+    }
+    return data as UserProfile;
+  } catch (err) {
+    console.error('Unexpected error in fetchProfile:', err);
+    return null;
+  }
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────
@@ -70,14 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load session on mount + subscribe to auth changes
   useEffect(() => {
     // Check existing session
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       const sess = data.session;
       setSession(sess);
       setUser(sess?.user ?? null);
+      setLoading(false); // Set loading false immediately after getting session
+      
       if (sess?.user) {
-        const p = await fetchProfile(sess.user.id);
-        setProfile(p);
+        fetchProfile(sess.user.id).then(p => {
+          setProfile(p);
+        });
       }
+    }).catch(err => {
+      console.error('Error getting session:', err);
       setLoading(false);
     });
 
