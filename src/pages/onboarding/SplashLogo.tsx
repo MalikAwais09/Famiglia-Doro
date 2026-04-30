@@ -1,13 +1,25 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 
 export function SplashLogo() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    const timer = setTimeout(() => navigate('/onboard'), 2000);
+    if (loading) return;
+    
+    const timer = setTimeout(() => {
+      if (user) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/onboard', { replace: true });
+      }
+    }, 2000);
+    
     return () => clearTimeout(timer);
-  }, [navigate]);
+  }, [navigate, user, loading]);
 
   return (
     <div className="min-h-screen bg-[#0E0E0F] flex items-center justify-center">
