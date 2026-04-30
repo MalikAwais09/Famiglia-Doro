@@ -23,7 +23,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: window.location.origin,
     },
   });
   return { data, error };
@@ -34,7 +34,7 @@ export async function signInWithApple() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'apple',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: window.location.origin,
     },
   });
   return { data, error };
