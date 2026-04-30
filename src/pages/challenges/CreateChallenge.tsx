@@ -96,6 +96,7 @@ export function CreateChallenge() {
         start_date: form.challengeStart || undefined,
         end_date: form.challengeEnd || undefined,
         rules: allRules,
+        phase: 'entry_open',
       };
 
       // Wrap createChallenge in a 10-second timeout to prevent infinite loading
@@ -119,7 +120,7 @@ export function CreateChallenge() {
       }
 
       toast.success('Challenge created successfully!');
-      navigate(`/challenges/${created.id}/success`);
+      navigate('/challenges');
     } catch (err: any) {
       console.error('Challenge creation error:', err);
       const msg = err?.message || (err instanceof Error ? err.message : 'Failed to create challenge');
