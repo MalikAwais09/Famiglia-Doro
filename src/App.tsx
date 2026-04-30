@@ -11,6 +11,7 @@ import { shouldShowGeo, getGeoMessage } from '@/lib/payment';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Lazy load all pages
 const SplashLogo = lazy(() => import('@/pages/onboarding/SplashLogo').then(m => ({ default: m.SplashLogo })));
@@ -81,50 +82,52 @@ function GeoComplianceModal() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <RoleProvider>
-          <WalletProvider>
-            <NotificationProvider>
-              <Toaster theme="dark" position="bottom-right" richColors />
-              <GeoComplianceModal />
-              <Suspense fallback={<SuspenseFallback />}>
-                <Routes>
-                  <Route path="/" element={<SplashLogo />} />
-                  <Route path="/onboard" element={<OnboardComplete />} />
-                  <Route path="/auth/sign-in" element={<SignIn />} />
-                  <Route path="/auth/sign-up" element={<SignUp />} />
-                  <Route path="/auth/verify-code" element={<VerifyCode />} />
-                  <Route path="/auth/success" element={<Success />} />
-                  <Route element={<Layout />}>
-                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/feed" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
-                    <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-                    <Route path="/challenges/create" element={<ProtectedRoute><CreateChallenge /></ProtectedRoute>} />
-                    <Route path="/challenges/:id" element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/enter" element={<ProtectedRoute><ChallengeEnter /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/success" element={<ProtectedRoute><ChallengeSuccess /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/entry-success" element={<ProtectedRoute><ChallengeEntrySuccess /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/voting" element={<ProtectedRoute><ChallengeVoting /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/submission-success" element={<ProtectedRoute><SubmissionSuccess /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/winners" element={<ProtectedRoute><ChallengeWinners /></ProtectedRoute>} />
-                    <Route path="/challenges/:id/claim-prize" element={<ProtectedRoute><ClaimPrize /></ProtectedRoute>} />
-                    <Route path="/my-entries" element={<ProtectedRoute><MyEntries /></ProtectedRoute>} />
-                    <Route path="/live-events" element={<ProtectedRoute><LiveEvents /></ProtectedRoute>} />
-                    <Route path="/live-events/:id/watch" element={<ProtectedRoute><LiveEventWatch /></ProtectedRoute>} />
-                    <Route path="/leaderboards" element={<ProtectedRoute><Leaderboards /></ProtectedRoute>} />
-                    <Route path="/tournaments" element={<ProtectedRoute><Tournaments /></ProtectedRoute>} />
-                    <Route path="/winners" element={<ProtectedRoute><WinnersPage /></ProtectedRoute>} />
-                    <Route path="/winners/:challengeId" element={<ProtectedRoute><WinnerSpotlight /></ProtectedRoute>} />
-                    <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
-                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                  </Route>
-                </Routes>
-              </Suspense>
-            </NotificationProvider>
-          </WalletProvider>
-        </RoleProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <RoleProvider>
+            <WalletProvider>
+              <NotificationProvider>
+                <Toaster theme="dark" position="bottom-right" richColors />
+                <GeoComplianceModal />
+                <Suspense fallback={<SuspenseFallback />}>
+                  <Routes>
+                    <Route path="/" element={<SplashLogo />} />
+                    <Route path="/onboard" element={<OnboardComplete />} />
+                    <Route path="/auth/sign-in" element={<SignIn />} />
+                    <Route path="/auth/sign-up" element={<SignUp />} />
+                    <Route path="/auth/verify-code" element={<VerifyCode />} />
+                    <Route path="/auth/success" element={<Success />} />
+                    <Route element={<Layout />}>
+                      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                      <Route path="/feed" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
+                      <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+                      <Route path="/challenges/create" element={<ProtectedRoute><CreateChallenge /></ProtectedRoute>} />
+                      <Route path="/challenges/:id" element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/enter" element={<ProtectedRoute><ChallengeEnter /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/success" element={<ProtectedRoute><ChallengeSuccess /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/entry-success" element={<ProtectedRoute><ChallengeEntrySuccess /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/voting" element={<ProtectedRoute><ChallengeVoting /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/submission-success" element={<ProtectedRoute><SubmissionSuccess /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/winners" element={<ProtectedRoute><ChallengeWinners /></ProtectedRoute>} />
+                      <Route path="/challenges/:id/claim-prize" element={<ProtectedRoute><ClaimPrize /></ProtectedRoute>} />
+                      <Route path="/my-entries" element={<ProtectedRoute><MyEntries /></ProtectedRoute>} />
+                      <Route path="/live-events" element={<ProtectedRoute><LiveEvents /></ProtectedRoute>} />
+                      <Route path="/live-events/:id/watch" element={<ProtectedRoute><LiveEventWatch /></ProtectedRoute>} />
+                      <Route path="/leaderboards" element={<ProtectedRoute><Leaderboards /></ProtectedRoute>} />
+                      <Route path="/tournaments" element={<ProtectedRoute><Tournaments /></ProtectedRoute>} />
+                      <Route path="/winners" element={<ProtectedRoute><WinnersPage /></ProtectedRoute>} />
+                      <Route path="/winners/:challengeId" element={<ProtectedRoute><WinnerSpotlight /></ProtectedRoute>} />
+                      <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
+                      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    </Route>
+                  </Routes>
+                </Suspense>
+              </NotificationProvider>
+            </WalletProvider>
+          </RoleProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
