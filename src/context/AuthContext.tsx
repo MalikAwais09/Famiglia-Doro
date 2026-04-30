@@ -120,11 +120,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── signOut ─────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
-    await authSignOut();
+    try {
+      await authSignOut();
+    } catch (e) {
+      console.error('Sign out error', e);
+    }
     setUser(null);
     setProfile(null);
     setSession(null);
-    navigate('/auth/sign-in');
+    navigate('/auth/sign-in', { replace: true });
   }, [navigate]);
 
   // ── Google OAuth ────────────────────────────────────────────────────────

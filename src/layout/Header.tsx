@@ -12,7 +12,8 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuToggle }: HeaderProps) {
-  const { userName } = useAuth();
+  const { profile } = useAuth();
+  const userName = profile?.name;
   const { role, isCreator, isElite } = useRole();
   const { balance } = useWallet();
   const { unreadCount } = useNotifications();
@@ -57,7 +58,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <button onClick={() => setProfileOpen(!profileOpen)} className="w-8 h-8 rounded-full gold-border overflow-hidden">
             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=User" alt="" className="w-full h-full" />
           </button>
-          {profileOpen && <ProfileDropdown onClose={() => setProfileOpen(false)} userName={userName} />}
+          {profileOpen && <ProfileDropdown onClose={() => setProfileOpen(false)} />}
         </div>
       </div>
     </header>
@@ -84,8 +85,9 @@ function NotificationsDropdown({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ProfileDropdown({ onClose, userName }: { onClose: () => void; userName: string }) {
-  const { signOut } = useAuth();
+function ProfileDropdown({ onClose }: { onClose: () => void }) {
+  const { profile, signOut } = useAuth();
+  const userName = profile?.name;
   const navigate = (path: string) => { onClose(); window.location.href = path; };
   return (
     <div className="absolute right-0 top-10 w-48 bg-[#1C1C1F] border border-[rgba(255,255,255,0.08)] rounded-lg shadow-xl z-50">

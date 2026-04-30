@@ -21,7 +21,8 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { userName, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
+  const userName = profile?.name;
   const { role, isCreator } = useRole();
   const [notifsEnabled, setNotifsEnabled] = useState(() => localStorage.getItem('fdoro_notifications_enabled') !== 'false');
 

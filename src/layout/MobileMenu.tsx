@@ -24,7 +24,8 @@ interface MobileMenuProps {
 export function MobileMenu({ open, onClose }: MobileMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { userName, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
+  const userName = profile?.name;
   const { isCreator } = useRole();
 
   if (!open) return null;
