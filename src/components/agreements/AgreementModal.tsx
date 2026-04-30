@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import { useAgreement } from '@/context/AgreementContext';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -134,7 +134,7 @@ interface AgreementModalProps {
   onClose?: () => void;
   onAgree?: () => void;
   title?: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
 export function AgreementModal({ open, onClose, onAgree, title, children }: AgreementModalProps) {
@@ -148,6 +148,8 @@ export function AgreementModal({ open, onClose, onAgree, title, children }: Agre
   const modalTitle = isContextMode 
     ? (agreementCtx.currentAgreement ? AGREEMENTS[agreementCtx.currentAgreement]?.title : '') 
     : title;
+
+  console.log('AgreementModal Render:', { visible, termsOpen: open, isContextMode, modalTitle });
 
   const handleAgree = () => {
     if (isContextMode && agreementCtx.currentAgreement) {

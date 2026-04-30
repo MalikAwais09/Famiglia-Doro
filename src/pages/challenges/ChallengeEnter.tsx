@@ -135,12 +135,31 @@ export function ChallengeEnter() {
           </Card>
         )}
 
-        <Button fullWidth onClick={() => isFree ? handleFreeEntry() : setTermsOpen(true)} loading={loading}>
+        <Button 
+          fullWidth 
+          onClick={() => {
+            console.log('Main button clicked. isFree:', isFree);
+            if (isFree) handleFreeEntry(); 
+            else {
+              console.log('Opening terms modal');
+              setTermsOpen(true);
+            }
+          }} 
+          loading={loading}
+        >
           {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
         </Button>
 
-        <AgreementModal open={termsOpen} onClose={() => setTermsOpen(false)} title="Challenge Entry Agreement"
-          onAgree={() => { setTermsOpen(false); if (isFree) handleFreeEntry(); else setPaymentOpen(true); }}>
+        <AgreementModal open={termsOpen} onClose={() => { console.log('Terms closed'); setTermsOpen(false); }} title="Challenge Entry Agreement"
+          onAgree={() => { 
+            console.log('Terms agreed. isFree:', isFree);
+            setTermsOpen(false); 
+            if (isFree) handleFreeEntry(); 
+            else {
+              console.log('Opening payment modal');
+              setPaymentOpen(true);
+            }
+          }}>
           <p className="mb-2">By entering this challenge, you agree to:</p>
           <ul className="list-disc list-inside space-y-1">
             <li>Comply with all platform rules</li>
