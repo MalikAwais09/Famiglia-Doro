@@ -111,7 +111,13 @@ export function ChallengeDetail() {
   };
 
   const getActionButtons = () => {
-    switch (challenge.phase) {
+    const isRegistrationOver = challenge?.registration_deadline && new Date(challenge.registration_deadline).getTime() < Date.now();
+
+    if (isRegistrationOver) {
+      return <Button disabled fullWidth>Registration Closed</Button>;
+    }
+
+    switch (challenge?.phase) {
       case 'upcoming':
         return <Button disabled fullWidth>Registration opens soon</Button>;
       case 'entry_open':
@@ -124,7 +130,7 @@ export function ChallengeDetail() {
             </div>
           );
         }
-        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/enter`)}>{isFree ? 'Enter Free Challenge' : `Enter Now (${challenge.entry_fee} DC)`}</Button>;
+        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/enter`)}>{isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}</Button>;
       case 'entry_closed':
         return <Button disabled fullWidth>Entry Closed</Button>;
       case 'voting':
@@ -136,8 +142,8 @@ export function ChallengeDetail() {
     }
   };
 
-  // Build rules array from joined challenge_rules
-  const rulesArray = (challenge.rules ?? []).map(r => r.rule_text);
+  // Build rules array from joined challenge_rules safely
+  const rulesArray = Array.isArray(challenge?.rules) ? challenge.rules.map(r => r?.rule_text).filter(Boolean) : [];
 
   return (
     <Container>
@@ -145,24 +151,24 @@ export function ChallengeDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <img
-              src={challenge.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'}
+              src={challenge?.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'}
               alt=""
               className="w-full h-48 md:h-64 object-cover rounded-lg"
               loading="lazy"
             />
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Badge>{challenge.category}</Badge>
-                <Badge variant={challenge.phase === 'entry_open' ? 'success' : challenge.phase === 'upcoming' ? 'info' : 'default'}>
-                  {challenge.phase.replace('_', ' ')}
+                <Badge>{challenge?.category}</Badge>
+                <Badge variant={challenge?.phase === 'entry_open' ? 'success' : challenge?.phase === 'upcoming' ? 'info' : 'default'}>
+                  {challenge?.phase?.replace('_', ' ')}
                 </Badge>
-                <Badge>{challenge.format}</Badge>
+                <Badge>{challenge?.format}</Badge>
               </div>
-              <h1 className="text-3xl font-bold mb-2">{challenge.title}</h1>
-              <p className="text-[#9CA3AF] text-sm">{challenge.description}</p>
-              {challenge.creator && (
+              <h1 className="text-3xl font-bold mb-2">{challenge?.title}</h1>
+              <p className="text-[#9CA3AF] text-sm">{challenge?.description}</p>
+              {challenge?.creator && (
                 <p className="text-xs text-[#6B7280] mt-2">
-                  by <span className="text-[#9CA3AF]">{challenge.creator.name ?? 'Unknown'}</span>
+                  by <span className="text-[#9CA3AF]">{challenge.creator?.name ?? 'Unknown'}</span>
                 </p>
               )}
             </div>
@@ -189,11 +195,11 @@ export function ChallengeDetail() {
               <h3 className="text-sm font-semibold mb-3">Timeline</h3>
               <div className="space-y-3">
                 {[
-                  { label: 'Registration Deadline', date: challenge.registration_deadline },
-                  { label: 'Challenge Start', date: challenge.start_date },
-                  { label: 'Challenge End', date: challenge.end_date },
-                  ...(challenge.voting_end_date ? [{ label: 'Voting End', date: challenge.voting_end_date }] : []),
-                  ...(challenge.results_date ? [{ label: 'Results', date: challenge.results_date }] : []),
+                  { label: 'Registration Deadline', date: challenge?.registration_deadline },
+                  { label: 'Challenge Start', date: challenge?.start_date },
+                  { label: 'Challenge End', date: challenge?.end_date },
+                  ...(challenge?.voting_end_date ? [{ label: 'Voting End', date: challenge.voting_end_date }] : []),
+                  ...(challenge?.results_date ? [{ label: 'Results', date: challenge.results_date }] : []),
                 ].filter(t => t.date).map((t, i) => {
                   const past = new Date(t.date!) < new Date();
                   return (
@@ -249,13 +255,13 @@ export function ChallengeDetail() {
           <div className="space-y-4">
             <Card>
               <div className="space-y-3">
-                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Entry Fee</span><span className="text-sm font-medium">{isFree ? <span className="text-emerald-400">Free</span> : `${challenge.entry_fee} DC`}</span></div>
-                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Participants</span><span className="text-sm font-medium flex items-center gap-1"><Users size={14} /> {challenge.current_participants}{challenge.max_participants ? `/${challenge.max_participants}` : ''}</span></div>
-                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Format</span><span className="text-sm font-medium">{challenge.format}</span></div>
-                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Prize Type</span><span className="text-sm font-medium">{challenge.prize_type}</span></div>
-                {challenge.prize_description && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Prize</span><span className="text-sm font-medium gold-text">{challenge.prize_description}</span></div>}
-                {challenge.start_date && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Start</span><span className="text-xs">{formatDateTime(challenge.start_date)}</span></div>}
-                {challenge.end_date && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">End</span><span className="text-xs">{formatDateTime(challenge.end_date)}</span></div>}
+                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Entry Fee</span><span className="text-sm font-medium">{isFree ? <span className="text-emerald-400">Free</span> : `${challenge?.entry_fee ?? 0} DC`}</span></div>
+                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Participants</span><span className="text-sm font-medium flex items-center gap-1"><Users size={14} /> {challenge?.current_participants ?? 0}{challenge?.max_participants ? `/${challenge.max_participants}` : ''}</span></div>
+                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Format</span><span className="text-sm font-medium">{challenge?.format}</span></div>
+                <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Prize Type</span><span className="text-sm font-medium">{challenge?.prize_type?.replace('_', ' ')}</span></div>
+                {challenge?.prize_description && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Prize</span><span className="text-sm font-medium gold-text">{challenge.prize_description}</span></div>}
+                {challenge?.start_date && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Start</span><span className="text-xs">{formatDateTime(challenge.start_date)}</span></div>}
+                {challenge?.end_date && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">End</span><span className="text-xs">{formatDateTime(challenge.end_date)}</span></div>}
               </div>
               <div className="mt-4 pt-4 border-t border-[rgba(255,255,255,0.08)] space-y-2">
                 {getActionButtons()}
@@ -274,7 +280,7 @@ export function ChallengeDetail() {
               </Card>
             )}
 
-            {challenge.sponsorship_enabled && (
+            {challenge?.sponsorship_enabled && (
               <Card>
                 <h3 className="text-sm font-semibold mb-2">Sponsorship</h3>
                 <p className="text-xs text-[#9CA3AF] mb-3">Fund the prize and negotiate ROI split.</p>

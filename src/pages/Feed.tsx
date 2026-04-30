@@ -76,10 +76,10 @@ export function Feed() {
                   <div className="relative">
                     <img src={c.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-36 object-cover" loading="lazy" />
                     <Badge variant={c.phase === 'entry_open' ? 'success' : c.phase === 'upcoming' ? 'info' : 'default'} className="absolute top-2 left-2">
-                      {c.phase.replace('_', ' ')}
+                      {c.phase?.replace('_', ' ')}
                     </Badge>
                     <Badge variant={c.prize_type === 'cash' ? 'gold' : 'default'} className="absolute top-2 right-2">
-                      {c.prize_type.replace('_', ' ')}
+                      {c.prize_type?.replace('_', ' ')}
                     </Badge>
                   </div>
                   <div className="p-4">

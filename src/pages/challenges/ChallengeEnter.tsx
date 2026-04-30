@@ -45,11 +45,11 @@ export function ChallengeEnter() {
     if (challengeId) load();
   }, [challengeId]);
 
-  const isFree = !challenge || challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0;
-  const totalPool = challenge ? challenge.entry_fee * challenge.current_participants : 0;
-
   if (pageLoading) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Loading...</p></Section></Container>;
   if (!challenge) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Challenge not found</p></Section></Container>;
+
+  const isFree = challenge?.prize_type === 'bragging_rights' || challenge?.entry_fee === 0;
+  const totalPool = challenge ? challenge.entry_fee * (challenge.current_participants || 0) : 0;
 
   if (hasEntered) {
     return (
@@ -111,11 +111,11 @@ export function ChallengeEnter() {
       <div className="max-w-lg mx-auto space-y-6">
         <h1 className="text-2xl font-bold">Enter Challenge</h1>
         <Card className="overflow-hidden p-0">
-          <img src={challenge.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-40 object-cover" />
+          <img src={challenge?.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-40 object-cover" />
           <div className="p-4">
-            <Badge className="mb-2">{challenge.category}</Badge>
-            <h2 className="text-lg font-semibold">{challenge.title}</h2>
-            <p className="text-sm text-[#9CA3AF] mt-1">{challenge.description}</p>
+            <Badge className="mb-2">{challenge?.category}</Badge>
+            <h2 className="text-lg font-semibold">{challenge?.title}</h2>
+            <p className="text-sm text-[#9CA3AF] mt-1">{challenge?.description}</p>
           </div>
         </Card>
 
@@ -132,7 +132,7 @@ export function ChallengeEnter() {
         )}
 
         <Button fullWidth onClick={() => isFree ? handleFreeEntry() : setTermsOpen(true)} loading={loading}>
-          {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge.entry_fee} DC)`}
+          {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
         </Button>
 
         <AgreementModal open={termsOpen} onClose={() => setTermsOpen(false)} title="Challenge Entry Agreement"
@@ -162,8 +162,8 @@ export function ChallengeEnter() {
               ) : payMethod === 'dorocoin' ? (
                 <div className="space-y-3">
                   <p className="text-sm">Current balance: <span className="font-bold">{balance} DC</span></p>
-                  {balance < challenge.entry_fee && <p className="text-xs text-red-400">Insufficient balance. Need {challenge.entry_fee - balance} more DC.</p>}
-                  <Button fullWidth loading={loading} disabled={balance < challenge.entry_fee} onClick={handleDoroCoinPay}>Pay {challenge.entry_fee} DoroCoins</Button>
+                  {balance < (challenge?.entry_fee ?? 0) && <p className="text-xs text-red-400">Insufficient balance. Need {(challenge?.entry_fee ?? 0) - balance} more DC.</p>}
+                  <Button fullWidth loading={loading} disabled={balance < (challenge?.entry_fee ?? 0)} onClick={handleDoroCoinPay}>Pay {challenge?.entry_fee ?? 0} DoroCoins</Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -171,7 +171,7 @@ export function ChallengeEnter() {
                   <Input placeholder="1234 5678 9012 3456" />
                   <div className="grid grid-cols-2 gap-2"><Input placeholder="MM/YY" /><Input placeholder="CVV" type="password" /></div>
                   <p className="text-xs text-[#6B7280]">This is a mock checkout for demonstration purposes.</p>
-                  <Button fullWidth loading={loading} onClick={handleCardPay}>Pay ${challenge.entry_fee}</Button>
+                  <Button fullWidth loading={loading} onClick={handleCardPay}>Pay ${challenge?.entry_fee ?? 0}</Button>
                 </div>
               )}
               <Button variant="ghost" fullWidth onClick={() => { setPaymentOpen(false); setPayMethod(null); }}>Cancel</Button>
