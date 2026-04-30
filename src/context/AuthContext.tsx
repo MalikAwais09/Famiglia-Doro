@@ -1,0 +1,175 @@
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
+import {
+  signIn as authSignIn,
+  signUp as authSignUp,
+  signOut as authSignOut,
+  signInWithGoogle as authSignInWithGoogle,
+  signInWithApple as authSignInWithApple,
+} from '@/lib/supabase/auth';
+
+// ── Profile type (mirrors our profiles table) ─────────────────────────────
+export interface UserProfile {
+  id: string;
+  name: string | null;
+  role: 'free' | 'creatorPro' | 'eliteHost';
+  points: number;
+  wins: number;
+  challenges_count: number;
+  avatar_url: string | null;
+  dorocoin_balance: number;
+  is_banned: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Context shape ─────────────────────────────────────────────────────────
+interface AuthContextType {
+  user: User | null;
+  profile: UserProfile | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (name: string, email: string, password: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithApple: () => Promise<{ error: Error | null }>;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+// ── Helper: fetch profile from DB ─────────────────────────────────────────
+async function fetchProfile(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error) return null;
+  return data as UserProfile;
+}
+
+// ── Provider ──────────────────────────────────────────────────────────────
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  // Load session on mount + subscribe to auth changes
+  useEffect(() => {
+    // Check existing session
+    supabase.auth.getSession().then(async ({ data }) => {
+      const sess = data.session;
+      setSession(sess);
+      setUser(sess?.user ?? null);
+      if (sess?.user) {
+        const p = await fetchProfile(sess.user.id);
+        setProfile(p);
+      }
+      setLoading(false);
+    });
+
+    // Subscribe to future auth events
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+      setSession(sess);
+      setUser(sess?.user ?? null);
+      if (sess?.user) {
+        const p = await fetchProfile(sess.user.id);
+        setProfile(p);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // ── signIn ──────────────────────────────────────────────────────────────
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { user: authUser, session: authSession, error } = await authSignIn(email, password);
+    if (authUser) {
+      setUser(authUser);
+      setSession(authSession);
+      const p = await fetchProfile(authUser.id);
+      setProfile(p);
+    }
+    return { error: error as Error | null };
+  }, []);
+
+  // ── signUp ──────────────────────────────────────────────────────────────
+  const signUp = useCallback(async (name: string, email: string, password: string) => {
+    const { user: authUser, error } = await authSignUp(name, email, password);
+    if (authUser) {
+      setUser(authUser);
+    }
+    return { error: error as Error | null };
+  }, []);
+
+  // ── signOut ─────────────────────────────────────────────────────────────
+  const signOut = useCallback(async () => {
+    await authSignOut();
+    setUser(null);
+    setProfile(null);
+    setSession(null);
+    navigate('/auth/sign-in');
+  }, [navigate]);
+
+  // ── Google OAuth ────────────────────────────────────────────────────────
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await authSignInWithGoogle();
+    return { error: error as Error | null };
+  }, []);
+
+  // ── Apple OAuth ─────────────────────────────────────────────────────────
+  const signInWithApple = useCallback(async () => {
+    const { error } = await authSignInWithApple();
+    return { error: error as Error | null };
+  }, []);
+
+  // ── refreshProfile ───────────────────────────────────────────────────────
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      const p = await fetchProfile(user.id);
+      setProfile(p);
+    }
+  }, [user]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        session,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        signInWithGoogle,
+        signInWithApple,
+        refreshProfile,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}
