@@ -32,7 +32,7 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
     .from('challenges')
     .select(`
       *,
-      creator:profiles!challenges_created_by_fkey (
+      creator:profiles (
         id, name, avatar_url, role
       )
     `)
@@ -62,7 +62,7 @@ export async function getChallengeById(id: string): Promise<Challenge | null> {
     .from('challenges')
     .select(`
       *,
-      creator:profiles!challenges_created_by_fkey (
+      creator:profiles (
         id, name, avatar_url, role
       ),
       rules:challenge_rules (
