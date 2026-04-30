@@ -14,7 +14,7 @@ const SUBMISSION_TYPES: { value: SubmissionType; label: string; icon: typeof Vid
   { value: 'image', label: 'Image', icon: Image, desc: 'Image URL' },
   { value: 'text', label: 'Text', icon: FileText, desc: 'Written content' },
   { value: 'link', label: 'Link', icon: Link, desc: 'External URL' },
-  { value: 'file', label: 'File', icon: File, desc: 'File URL' },
+  { value: 'file', label: 'File', icon: FileIcon, desc: 'File URL' },
 ];
 
 interface SubmissionFormModalProps {

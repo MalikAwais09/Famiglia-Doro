@@ -78,13 +78,17 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
   if (entryError) throw entryError;
 
   // Increment participants
-  await supabase.rpc('increment_participants', { challenge_id: challengeId }).catch(() => {
+  try {
+    const { error: rpcError } = await supabase.rpc('increment_participants', { challenge_id: challengeId });
+    if (rpcError) throw rpcError;
+  } catch (err) {
+    console.warn('RPC increment_participants failed, falling back to manual update:', err);
     // Fallback: manual
-    supabase
+    await supabase
       .from('challenges')
-      .update({ current_participants: challenge.current_participants + 1 })
+      .update({ current_participants: (challenge.current_participants || 0) + 1 })
       .eq('id', challengeId);
-  });
+  }
 
   // Notify creator (if not self)
   if (challenge.created_by !== userId) {
@@ -157,12 +161,16 @@ export async function withdrawEntry(challengeId: string, entryId: string): Promi
   if (error) throw error;
 
   // Decrement participants
-  await supabase.rpc('decrement_participants', { challenge_id: challengeId }).catch(() => {
-    supabase
+  try {
+    const { error: rpcError } = await supabase.rpc('decrement_participants', { challenge_id: challengeId });
+    if (rpcError) throw rpcError;
+  } catch (err) {
+    console.warn('RPC decrement_participants failed, falling back to manual update:', err);
+    await supabase
       .from('challenges')
-      .update({ current_participants: Math.max(0, challenge.current_participants - 1) })
+      .update({ current_participants: Math.max(0, (challenge.current_participants || 0) - 1) })
       .eq('id', challengeId);
-  });
+  }
 
   return { success: true, refunded };
 }

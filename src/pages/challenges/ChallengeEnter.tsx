@@ -74,8 +74,20 @@ export function ChallengeEnter() {
     setLoading(true);
     try {
       const entry = await enterChallenge(challengeId);
-      toast.success('Entry submitted successfully');
-      navigate(`/challenges/${challengeId}/entry-success`, { state: { entry, paymentMethod: 'free' } });
+      console.log('Entry successful:', entry);
+      toast.success('Successfully entered challenge!');
+      
+      navigate(`/challenges/${challengeId}/entry-success`, { 
+        state: { 
+          entry: {
+            id: entry.id,
+            challengeTitle: challenge?.title,
+            entryFee: challenge?.entry_fee,
+            enteredAt: entry.created_at
+          },
+          paymentMethod: isFree ? 'free' : 'dorocoin'
+        }
+      });
     } catch (err: any) {
       toast.error(err.message || 'Failed to enter challenge');
     } finally {
