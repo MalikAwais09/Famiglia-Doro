@@ -98,7 +98,15 @@ export function CreateChallenge() {
         rules: allRules,
       };
 
-      const created = await createChallenge(payload);
+      // Wrap createChallenge in a 10-second timeout to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Request timed out. Please try again.')), 10000)
+      );
+      
+      const created = await Promise.race([
+        createChallenge(payload),
+        timeoutPromise
+      ]);
 
       // Upload cover image if user selected one
       if (promoImageFileRef.current) {
@@ -112,8 +120,9 @@ export function CreateChallenge() {
 
       toast.success('Challenge created successfully!');
       navigate(`/challenges/${created.id}/success`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create challenge';
+    } catch (err: any) {
+      console.error('Challenge creation error:', err);
+      const msg = err?.message || (err instanceof Error ? err.message : 'Failed to create challenge');
       toast.error(msg);
     } finally {
       setLoading(false);

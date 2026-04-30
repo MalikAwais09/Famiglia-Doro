@@ -36,8 +36,8 @@ export function SignUp() {
     // Store email so VerifyCode page can use it for OTP verification
     sessionStorage.setItem('signup_email', data.email);
     sessionStorage.setItem('signup_name', data.name);
-    toast.success('Account created — check your email for a verification code');
-    navigate('/auth/verify-code');
+    toast.success('Account created! Please check your email for a confirmation link.');
+    navigate('/auth/success');
   };
 
   return (
