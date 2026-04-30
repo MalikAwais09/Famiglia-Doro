@@ -13,7 +13,8 @@ import { MOCK_CHALLENGES, MOCK_ENTRIES } from '@/lib/mock/data';
 import { Swords, Wallet, Zap, Plus, Trophy, LayoutGrid, Crown, Radio } from 'lucide-react';
 
 export function Dashboard() {
-  const { userId } = useAuth();
+  const { user } = useAuth();
+  const userId = user?.id;
   const { role, isCreator, isElite } = useRole();
   const { balance } = useWallet();
   const navigate = useNavigate();

@@ -95,20 +95,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Subscribe to future auth events
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, sess) => {
+      console.log('Auth state change:', event, sess?.user?.id);
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        const p = await fetchProfile(sess.user.id);
-        setProfile(p);
+        fetchProfile(sess.user.id).then(setProfile);
       } else {
         setProfile(null);
       }
       setLoading(false);
     });
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+    // Safety timeout: Never stay loading more than 2.5 seconds
+    const safety = setTimeout(() => {
+      if (loading) {
+        console.warn('Auth loading safety timeout hit - forcing load');
+        setLoading(false);
+      }
+    }, 2500);
+
+    return () => {
+      listener.subscription.unsubscribe();
+      clearTimeout(safety);
+    };
+  }, [loading]);
 
   // ── signIn ──────────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
@@ -133,16 +144,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── signOut ─────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
+    console.log('Sign out initiated');
     try {
       await authSignOut();
     } catch (e) {
-      console.error('Sign out error', e);
+      console.warn('Supabase sign out error (ignoring):', e);
     }
+    // Force clear state regardless of API success
     setUser(null);
     setProfile(null);
     setSession(null);
-    navigate('/auth/sign-in', { replace: true });
-  }, [navigate]);
+    localStorage.removeItem('supabase.auth.token'); // Clear possible legacy tokens
+    
+    console.log('Sign out complete, redirecting...');
+    window.location.href = '/auth/sign-in';
+  }, []);
 
   // ── Google OAuth ────────────────────────────────────────────────────────
   const signInWithGoogle = useCallback(async () => {
