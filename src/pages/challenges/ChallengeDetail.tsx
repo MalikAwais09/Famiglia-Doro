@@ -111,9 +111,31 @@ export function ChallengeDetail() {
   };
 
   const getActionButtons = () => {
-    const isRegistrationOver = challenge?.registration_deadline && new Date(challenge.registration_deadline).getTime() < Date.now();
+    const now = Date.now();
+    const isRegistrationOver = challenge?.registration_deadline && new Date(challenge.registration_deadline).getTime() < now;
+    const isStarted = challenge?.start_date && new Date(challenge.start_date).getTime() <= now;
 
-    if (isRegistrationOver) {
+    if (hasEntered) {
+      if (challenge?.phase === 'completed') {
+        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
+      }
+
+      return (
+        <div className="space-y-2">
+          {isStarted ? (
+            <Button fullWidth onClick={() => setSubmitOpen(true)}>Start Challenge (Submit Work)</Button>
+          ) : (
+            <Button fullWidth onClick={() => setSubmitOpen(true)}>Submit Your Work</Button>
+          )}
+          <Button fullWidth variant="secondary" onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>
+          {!isStarted && (
+            <Button fullWidth variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" loading={withdrawLoading} onClick={handleWithdraw}>Withdraw Entry</Button>
+          )}
+        </div>
+      );
+    }
+
+    if (isRegistrationOver || challenge?.phase === 'entry_closed') {
       return <Button disabled fullWidth>Registration Closed</Button>;
     }
 
@@ -121,18 +143,7 @@ export function ChallengeDetail() {
       case 'upcoming':
         return <Button disabled fullWidth>Registration opens soon</Button>;
       case 'entry_open':
-        if (hasEntered) {
-          return (
-            <div className="space-y-2">
-              <Button fullWidth onClick={() => setSubmitOpen(true)}>Submit Your Work</Button>
-              <Button fullWidth variant="secondary" onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>
-              <Button fullWidth variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" loading={withdrawLoading} onClick={handleWithdraw}>Withdraw Entry</Button>
-            </div>
-          );
-        }
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/enter`)}>{isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}</Button>;
-      case 'entry_closed':
-        return <Button disabled fullWidth>Entry Closed</Button>;
       case 'voting':
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
       case 'completed':

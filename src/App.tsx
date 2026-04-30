@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { RoleProvider } from '@/context/RoleContext';
 import { WalletProvider } from '@/context/WalletContext';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { AgreementProvider } from '@/context/AgreementContext';
 import { Layout } from '@/layout/Layout';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { shouldShowGeo, getGeoMessage } from '@/lib/payment';
@@ -88,6 +89,7 @@ export default function App() {
           <RoleProvider>
             <WalletProvider>
               <NotificationProvider>
+              <AgreementProvider>
                 <Toaster theme="dark" position="bottom-right" richColors />
                 <GeoComplianceModal />
                 <Suspense fallback={<SuspenseFallback />}>
@@ -123,6 +125,7 @@ export default function App() {
                     </Route>
                   </Routes>
                 </Suspense>
+              </AgreementProvider>
               </NotificationProvider>
             </WalletProvider>
           </RoleProvider>
