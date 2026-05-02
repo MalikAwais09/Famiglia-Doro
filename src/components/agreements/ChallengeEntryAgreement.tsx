@@ -40,6 +40,7 @@ export function ChallengeEntryAgreement({ challenge, isPaid, isOpen, onConfirm, 
       title="Enter Challenge"
       description={challenge.title}
       legalText={box}
+      requireScrollToBottom={false}
       checkboxes={checkboxes}
       confirmLabel="Enter Challenge"
       agreementType="challenge_entry"
