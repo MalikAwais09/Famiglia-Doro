@@ -71,8 +71,11 @@ export async function getLeaderboard(
     if (ratioB !== ratioA) return ratioB - ratioA;
 
     // Tertiary sort: Points (if type was wins) or Wins (if type was points)
-    if (type === 'wins') return b.points - a.points;
-    return b.wins - a.wins;
+    const tertiary = type === 'wins' ? b.points - a.points : b.wins - a.wins;
+    if (tertiary !== 0) return tertiary;
+
+    // Final tie-breaker: Challenges Count (important for 0 points/0 wins case)
+    return b.challenges_count - a.challenges_count;
   });
 
   return rows.map((p, i) => ({
