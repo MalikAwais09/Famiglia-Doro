@@ -10,10 +10,9 @@ export interface LeaderboardRow {
   points: number;
   wins: number;
   challenges_count: number;
-  win_rate: number;
 }
 
-export type LeaderboardType = 'points' | 'wins' | 'challenges_count';
+export type LeaderboardType = 'points' | 'wins';
 export type LeaderboardPeriod = 'all' | 'weekly' | 'monthly';
 
 function periodCutoffIso(period: LeaderboardPeriod): string | null {
@@ -39,10 +38,8 @@ export async function getLeaderboard(
     q = q.gte('updated_at', cutoff);
   }
 
-  // Compound sort per user request: points -> wins
-  q = q.order('points', { ascending: false })
-       .order('wins', { ascending: false })
-       .limit(50);
+  const orderCol = type === 'wins' ? 'wins' : 'points';
+  q = q.order(orderCol, { ascending: false }).limit(50);
 
   const { data, error } = await q;
 
@@ -58,7 +55,6 @@ export async function getLeaderboard(
     points: p.points,
     wins: p.wins,
     challenges_count: p.challenges_count,
-    win_rate: p.challenges_count > 0 ? (p.wins / p.challenges_count) * 100 : 0,
   }));
 }
 
@@ -74,26 +70,19 @@ export async function getCurrentUserRank(
 
   const { data: me, error: meErr } = await supabase
     .from('profiles')
-    .select('points, wins, challenges_count')
+    .select('points, wins')
     .eq('id', session.user.id)
     .single();
 
   if (meErr || !me) return null;
 
+  const myScore = type === 'wins' ? me.wins : me.points;
   const cutoff = periodCutoffIso(period);
 
-  // For rank calculation, we need to match the compound sort logic
-  // This is tricky with simple .gt() filters for compound sorts.
-  // We'll simplify to primary sort by challenges_count if type is not specified or matching the new logic.
-  let countQuery = supabase.from('profiles').select('id', { count: 'exact', head: true });
-  
-  if (type === 'points') {
-    countQuery = countQuery.gt('points', me.points);
-  } else if (type === 'wins') {
-    countQuery = countQuery.gt('wins', me.wins);
-  } else {
-    countQuery = countQuery.gt('challenges_count', me.challenges_count);
-  }
+  let countQuery =
+    type === 'wins'
+      ? supabase.from('profiles').select('id', { count: 'exact', head: true }).gt('wins', myScore)
+      : supabase.from('profiles').select('id', { count: 'exact', head: true }).gt('points', myScore);
 
   if (cutoff) {
     countQuery = countQuery.gte('updated_at', cutoff);

@@ -99,32 +99,6 @@ export function ChallengeDetail() {
     };
   }, [id]);
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success('Link copied');
-  };
-
-  const handleWithdraw = async () => {
-    if (!myEntry || !id) return;
-    if (!confirm('Are you sure you want to withdraw your entry?')) return;
-    setWithdrawLoading(true);
-    try {
-      const res = await withdrawEntry(id, myEntry.id);
-      setHasEntered(false);
-      setMyEntry(null);
-      if (res.refunded > 0) {
-        await refreshBalance();
-        toast.success(`Entry withdrawn. ${res.refunded} DC refunded.`);
-      } else {
-        toast.success('Entry withdrawn.');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to withdraw entry');
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
-
   const getActionButtons = () => {
     if (!challenge || !id) return null;
 

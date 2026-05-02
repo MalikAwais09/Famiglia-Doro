@@ -64,7 +64,7 @@ export function Leaderboards() {
   return (
     <Container>
       <Section>
-        <PageHeader title="Leaderboards" subtitle="Top competitors ranked by points and win rate" />
+        <PageHeader title="Leaderboards" subtitle="Top competitors ranked by points" />
         <div className="flex gap-2 mb-6">
           {TABS.map(t => (
             <button
@@ -90,9 +90,6 @@ export function Leaderboards() {
                     <th className="text-left text-xs text-[#9CA3AF] px-4 py-3">Player</th>
                     <th className="text-right text-xs text-[#9CA3AF] px-4 py-3">Points</th>
                     <th className="text-right text-xs text-[#9CA3AF] px-4 py-3 hidden sm:table-cell">Wins</th>
-                    <th className="text-right text-xs text-[#9CA3AF] px-4 py-3 hidden md:table-cell">
-                      Win Rate
-                    </th>
                     <th className="text-right text-xs text-[#9CA3AF] px-4 py-3 hidden sm:table-cell">
                       Challenges
                     </th>
@@ -101,7 +98,7 @@ export function Leaderboards() {
                 <tbody>
                   {data.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-12 text-center text-sm text-[#6B7280]">
+                      <td colSpan={5} className="px-4 py-12 text-center text-sm text-[#6B7280]">
                         No leaderboard entries yet for this period.
                       </td>
                     </tr>
@@ -134,9 +131,6 @@ export function Leaderboards() {
                         </td>
                         <td className="px-4 py-3 text-right text-sm text-[#9CA3AF] hidden sm:table-cell">
                           {u.wins}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm text-emerald-400 font-medium hidden md:table-cell">
-                          {u.win_rate.toFixed(1)}%
                         </td>
                         <td className="px-4 py-3 text-right text-sm text-[#9CA3AF] hidden sm:table-cell">
                           {u.challenges_count}
