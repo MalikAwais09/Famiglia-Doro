@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { formatDateTime } from '@/lib/utils';
+import { formatRelativeTime, getTimeZoneName } from '@/lib/utils/dateUtils';
 import { Users, Share2, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { AgreementModal } from '@/components/agreements/AgreementModal';
@@ -275,6 +276,9 @@ export function ChallengeDetail() {
                   );
                 })}
               </div>
+              <p className="text-[10px] text-[#6B7280] mt-3">
+                Times shown in your time zone ({getTimeZoneName()}).
+              </p>
             </Card>
 
             {/* Rules */}
@@ -305,7 +309,7 @@ export function ChallengeDetail() {
                           {c.user?.avatar_url && <img src={c.user.avatar_url} className="w-4 h-4 rounded-full" alt="" />}
                           <span className="text-xs font-medium">{c.user?.name || 'Anonymous'}</span>
                         </div>
-                        <span className="text-[10px] text-[#6B7280]">{new Date(c.created_at).toLocaleDateString()}</span>
+                        <span className="text-[10px] text-[#6B7280]">{formatRelativeTime(c.created_at)}</span>
                       </div>
                       <p className="text-xs text-[#9CA3AF]">{c.content}</p>
                     </div>
@@ -335,6 +339,9 @@ export function ChallengeDetail() {
                 {challenge?.prize_description && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Prize</span><span className="text-sm font-medium gold-text">{challenge.prize_description}</span></div>}
                 {challenge?.start_date && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">Start</span><span className="text-xs">{formatDateTime(challenge.start_date)}</span></div>}
                 {challenge?.end_date && <div className="flex items-center justify-between"><span className="text-xs text-[#9CA3AF]">End</span><span className="text-xs">{formatDateTime(challenge.end_date)}</span></div>}
+                {(challenge?.start_date || challenge?.end_date) && (
+                  <p className="text-[10px] text-[#6B7280] pt-1">Your time zone: {getTimeZoneName()}</p>
+                )}
               </div>
               <div className="mt-4 pt-4 border-t border-[rgba(255,255,255,0.08)] space-y-2">
                 {getActionButtons()}

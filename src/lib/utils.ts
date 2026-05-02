@@ -1,4 +1,10 @@
 import type { Challenge, Submission, LeaderboardEntry } from '@/types';
+import {
+  formatLocalDateTime,
+  formatLocalDate,
+  formatRelativeTime,
+  getLocalCalendarDateString,
+} from './utils/dateUtils';
 
 // ==================== EXISTING UTILITIES (kept for backward compatibility) ====================
 
@@ -13,37 +19,15 @@ export function formatNumber(n: number): string {
 }
 
 export function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return date.toLocaleDateString();
+  return formatRelativeTime(dateStr);
 }
 
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric',
-    timeZone: 'Asia/Karachi'
-  });
+  return formatLocalDate(dateStr);
 }
 
 export function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('en-US', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit',
-    timeZone: 'Asia/Karachi'
-  });
+  return formatLocalDateTime(dateStr);
 }
 
 export function generateId(prefix: string = ''): string {
@@ -53,12 +37,7 @@ export function generateId(prefix: string = ''): string {
 }
 
 export function getTodayString(): string {
-  return new Intl.DateTimeFormat('en-CA', { 
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'Asia/Karachi'
-  }).format(new Date());
+  return getLocalCalendarDateString();
 }
 
 export function getDaysUntil(dateStr: string): number {
@@ -85,22 +64,20 @@ export function detectRegion(): string {
 // ==================== PRODUCTION UTILITIES ====================
 
 export const formatTime = (date: Date): string => {
-  return new Intl.DateTimeFormat('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit', 
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
     second: '2-digit',
-    timeZone: 'Asia/Karachi'
   }).format(date);
 };
 
 export const formatDatetime = (date: Date): string => {
-  return new Intl.DateTimeFormat('en-US', { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric', 
-    hour: '2-digit', 
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Asia/Karachi'
   }).format(date);
 };
 

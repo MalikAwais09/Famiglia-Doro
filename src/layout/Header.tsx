@@ -6,6 +6,7 @@ import { useWallet } from '@/context/WalletContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { WalletDropdown } from '@/components/wallet/WalletDropdown';
 import { Badge } from '@/components/ui/Badge';
+import { formatRelativeTime } from '@/lib/utils/dateUtils';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -91,6 +92,9 @@ function NotificationsDropdown({ onClose }: { onClose: () => void }) {
           >
             <p className="text-sm font-medium">{n.title}</p>
             <p className="text-xs text-[#9CA3AF] mt-0.5">{n.message}</p>
+            {n.createdAt && (
+              <p className="text-[10px] text-[#6B7280] mt-1">{formatRelativeTime(n.createdAt)}</p>
+            )}
           </button>
         ))}
       </div>

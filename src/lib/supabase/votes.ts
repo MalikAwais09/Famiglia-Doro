@@ -1,4 +1,5 @@
 import { supabase } from './client';
+import { getLocalCalendarDateString } from '@/lib/utils/dateUtils';
 import type { Vote, Winner, Profile } from './types';
 
 // ── castVote ──────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ export async function castVote(submissionId: string, isPaid: boolean): Promise<{
 
   if (voteCount && voteCount > 0) throw new Error('You have already voted on this submission');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalCalendarDateString();
 
   // Handle free vote
   if (!isPaid) {
@@ -109,7 +110,7 @@ export async function getVoteStatus(challengeId: string): Promise<{ hasUsedFreeV
   const userId = sessionData.session?.user?.id;
   if (!userId) return { hasUsedFreeVoteToday: false, votedSubmissionIds: [] };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalCalendarDateString();
 
   // 1. Check free vote today
   const { count } = await supabase

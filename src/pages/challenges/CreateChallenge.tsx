@@ -12,6 +12,7 @@ import { CATEGORIES, SCORING_SYSTEMS, PREDEFINED_RULES, LOCATION_FORMATS } from 
 import { toast } from 'sonner';
 import { Check, ChevronLeft, ChevronRight, Upload, X } from 'lucide-react';
 import { createChallenge, uploadCoverImage } from '@/lib/supabase/challenges';
+import { localDateTimeInputToUtcIso } from '@/lib/utils/dateUtils';
 import type { CreateChallengePayload, ChallengeFormat, PrizeType, LocationFormat, ScoringSystem } from '@/lib/supabase/types';
 
 const STEPS = ['Details', 'Format', 'Prize', 'Schedule', 'Rules'];
@@ -92,9 +93,9 @@ export function CreateChallenge() {
           : form.judgingMethod === 'creator' ? 'creator_decision' : 'hybrid'
           : undefined,
         location_format: locationMap[form.locationFormat] ?? 'virtual',
-        registration_deadline: form.registrationDeadline || undefined,
-        start_date: form.challengeStart || undefined,
-        end_date: form.challengeEnd || undefined,
+        registration_deadline: localDateTimeInputToUtcIso(form.registrationDeadline),
+        start_date: localDateTimeInputToUtcIso(form.challengeStart),
+        end_date: localDateTimeInputToUtcIso(form.challengeEnd),
         rules: allRules,
         phase: 'entry_open',
       };

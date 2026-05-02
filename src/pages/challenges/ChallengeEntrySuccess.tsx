@@ -5,6 +5,7 @@ import { Section } from '@/layout/Section';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CheckCircle } from 'lucide-react';
+import { formatLocalDateTime } from '@/lib/utils/dateUtils';
 
 export function ChallengeEntrySuccess() {
   const { id } = useParams();
@@ -28,7 +29,7 @@ export function ChallengeEntrySuccess() {
               <div className="flex justify-between"><span className="text-[#9CA3AF]">Challenge</span><span>{state.entry.challengeTitle}</span></div>
               <div className="flex justify-between"><span className="text-[#9CA3AF]">Fee</span><span>{state.entry.entryFee || 0} DC</span></div>
               <div className="flex justify-between"><span className="text-[#9CA3AF]">Payment</span><span className="capitalize">{state.paymentMethod || 'free'}</span></div>
-              <div className="flex justify-between"><span className="text-[#9CA3AF]">Date</span><span className="text-xs">{state.entry.enteredAt ? new Date(state.entry.enteredAt).toLocaleDateString() : 'Now'}</span></div>
+              <div className="flex justify-between"><span className="text-[#9CA3AF]">Date</span><span className="text-xs">{state.entry.enteredAt ? formatLocalDateTime(state.entry.enteredAt) : 'Now'}</span></div>
               {state.breakdown && (
                 <div className="pt-2 border-t border-[rgba(255,255,255,0.08)]">
                   <div className="flex h-2 rounded-full overflow-hidden mb-1">
