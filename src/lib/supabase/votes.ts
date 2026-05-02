@@ -98,11 +98,35 @@ export async function castVote(submissionId: string, isPaid: boolean): Promise<{
 
   if (insertError) throw insertError;
 
-  // Increment votes
-  const newVoteCount = submission.votes_count + 1;
-  await supabase.rpc('increment_votes', { submission_id: submissionId }).catch(() => {
-    supabase.from('submissions').update({ votes_count: newVoteCount }).eq('id', submissionId);
-  });
+  const { error: rpcError } = await supabase.rpc('increment_votes', { submission_id: submissionId });
+
+  let newVoteCount = submission.votes_count + 1;
+
+  if (rpcError) {
+    console.error('increment_votes rpc failed:', rpcError);
+    const { data: currentSub, error: fetchErr } = await supabase
+      .from('submissions')
+      .select('votes_count')
+      .eq('id', submissionId)
+      .single();
+
+    if (fetchErr) {
+      console.error('Failed to fetch submission for vote count fallback:', fetchErr);
+      throw fetchErr;
+    }
+
+    newVoteCount = (currentSub?.votes_count ?? 0) + 1;
+
+    const { error: updateErr } = await supabase
+      .from('submissions')
+      .update({ votes_count: newVoteCount })
+      .eq('id', submissionId);
+
+    if (updateErr) {
+      console.error('Fallback vote increment failed:', updateErr);
+      throw updateErr;
+    }
+  }
 
   return { success: true, newVoteCount, isPaid, dorocoinsSpent: spent };
 }
@@ -186,15 +210,40 @@ export async function computeWinners(challengeId: string): Promise<(Winner & { u
       placement: placement
     }).eq('id', sub.id);
 
-    // 3. Update points and wins
-    await supabase.rpc('add_points', { user_id: sub.user_id, pts: points[i] }).catch(() => {
-      // Fallback
-    });
+    const { error: addPointsErr } = await supabase.rpc('add_points', { user_id: sub.user_id, pts: points[i] });
+    if (addPointsErr) {
+      console.error('add_points rpc failed:', addPointsErr);
+      const { data: prof, error: profErr } = await supabase
+        .from('profiles')
+        .select('points')
+        .eq('id', sub.user_id)
+        .single();
+      if (!profErr && prof) {
+        const { error: fbErr } = await supabase
+          .from('profiles')
+          .update({ points: (prof.points ?? 0) + points[i] })
+          .eq('id', sub.user_id);
+        if (fbErr) console.error('add_points fallback failed:', fbErr);
+      }
+    }
 
     if (placement === 1) {
-      await supabase.rpc('increment_wins', { user_id: sub.user_id }).catch(() => {
-        // Fallback
-      });
+      const { error: incWinsErr } = await supabase.rpc('increment_wins', { user_id: sub.user_id });
+      if (incWinsErr) {
+        console.error('increment_wins rpc failed:', incWinsErr);
+        const { data: prof, error: profErr } = await supabase
+          .from('profiles')
+          .select('wins')
+          .eq('id', sub.user_id)
+          .single();
+        if (!profErr && prof) {
+          const { error: fbErr } = await supabase
+            .from('profiles')
+            .update({ wins: (prof.wins ?? 0) + 1 })
+            .eq('id', sub.user_id);
+          if (fbErr) console.error('increment_wins fallback failed:', fbErr);
+        }
+      }
     }
 
     // 4. Notify winner
