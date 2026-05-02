@@ -9,7 +9,7 @@ import { getStorage } from '@/lib/storage';
 import type { Challenge } from '@/types';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
+import { ChallengeCreatorAgreement } from '@/components/agreements/ChallengeCreatorAgreement';
 import { toast } from 'sonner';
 
 export function ChallengeSuccess() {
@@ -32,17 +32,15 @@ export function ChallengeSuccess() {
           <Button variant="secondary" onClick={() => navigate('/challenges')}>View All Challenges</Button>
         </div>
       </div>
-      <AgreementModal open={publishOpen} onClose={() => setPublishOpen(false)} title="Creator Agreement"
-        onAgree={() => { toast.success('Challenge published'); setPublishOpen(false); navigate(`/challenges/${id}`); }}>
-        <p className="mb-2">By publishing this challenge, you agree to:</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>Abide by the Creator Policy at all times.</li>
-          <li>Accept the revenue share terms (35% creator, 50% winner, 15% platform).</li>
-          <li>Ensure all challenge content is appropriate and lawful.</li>
-          <li>Respond to participant inquiries in a timely manner.</li>
-          <li>Not modify challenge rules after publication without notice.</li>
-        </ul>
-      </AgreementModal>
+      <ChallengeCreatorAgreement
+        isOpen={publishOpen}
+        onCancel={() => setPublishOpen(false)}
+        onConfirm={() => {
+          toast.success('Challenge published');
+          setPublishOpen(false);
+          navigate(`/challenges/${id}`);
+        }}
+      />
     </Section></Container>
   );
 }

@@ -10,6 +10,7 @@ import { Bell, Share2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
+import { LiveEventAgreement } from '@/components/agreements/LiveEventAgreement';
 
 export function LiveEventWatch() {
   const { id } = useParams();
@@ -18,6 +19,7 @@ export function LiveEventWatch() {
     const r = getStorage<Record<string, string>>('reminders', {});
     return !!r[id || ''];
   });
+  const [liveAgreementOpen, setLiveAgreementOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -88,6 +90,14 @@ export function LiveEventWatch() {
   return (
     <Container>
       <Section>
+        <LiveEventAgreement
+          isOpen={liveAgreementOpen}
+          onCancel={() => setLiveAgreementOpen(false)}
+          onConfirm={() => {
+            setLiveAgreementOpen(false);
+            toast.success(`You have joined "${event.title}"`);
+          }}
+        />
         <div className="max-w-4xl mx-auto">
           <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6">
             {videoSrc ? (
@@ -115,6 +125,9 @@ export function LiveEventWatch() {
               <p className="text-xs text-[#6B7280] mt-2">Hosted by {hostName}</p>
             </div>
             <div className="flex gap-2 shrink-0">
+              <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
+                Join Live Event
+              </Button>
               <Button
                 variant="secondary"
                 onClick={() => {

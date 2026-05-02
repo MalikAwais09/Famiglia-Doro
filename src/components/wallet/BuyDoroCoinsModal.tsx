@@ -4,8 +4,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useWallet } from '@/context/WalletContext';
-import { logConsent } from '@/lib/payment';
 import { toast } from 'sonner';
+import { DoroCoinPurchaseAgreement } from '@/components/agreements/DoroCoinPurchaseAgreement';
+import { logAgreement } from '@/lib/supabase/agreements';
 import { loadStripe, createPaymentIntent, confirmPayment } from '@/lib/supabase/stripe';
 import type { DoroCoinPackage } from '@/lib/supabase/wallet';
 
@@ -38,7 +39,6 @@ function CardCheckout({
         toast.error(result.error ?? 'Payment failed');
         return;
       }
-      logConsent('dorocoin_purchase');
       toast.success(`${pkg.coins} DoroCoins added to your wallet`);
       await refreshBalance();
       await new Promise(r => setTimeout(r, 1600));
@@ -79,6 +79,8 @@ function CardCheckout({
 export function BuyDoroCoinsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState<'select' | 'pay'>('select');
   const [selected, setSelected] = useState<number | null>(null);
+  const [purchaseAgreeOpen, setPurchaseAgreeOpen] = useState(false);
+  const [pendingPkgIndex, setPendingPkgIndex] = useState<number | null>(null);
   const [method, setMethod] = useState<'card' | 'apple' | 'google' | null>(null);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -94,6 +96,7 @@ export function BuyDoroCoinsModal({ open, onClose }: { open: boolean; onClose: (
     setSelected(null);
     setMethod(null);
     setAgree(false);
+    setPurchaseAgreeOpen(false);
   };
 
   const handleAppleGoogleInfo = () => {
@@ -102,6 +105,21 @@ export function BuyDoroCoinsModal({ open, onClose }: { open: boolean; onClose: (
 
   return (
     <Modal open={open} onClose={onClose} title="Buy DoroCoins">
+      <DoroCoinPurchaseAgreement
+        isOpen={purchaseAgreeOpen}
+        onCancel={() => {
+          setPurchaseAgreeOpen(false);
+          setPendingPkgIndex(null);
+        }}
+        onConfirm={() => {
+          setPurchaseAgreeOpen(false);
+          if (pendingPkgIndex !== null) {
+            setSelected(pendingPkgIndex);
+            setStep('pay');
+          }
+          setPendingPkgIndex(null);
+        }}
+      />
       {step === 'select' && (
         <div className="space-y-3">
           <p className="text-sm text-[#9CA3AF]">
@@ -111,8 +129,8 @@ export function BuyDoroCoinsModal({ open, onClose }: { open: boolean; onClose: (
             <button
               key={p.id}
               onClick={() => {
-                setSelected(i);
-                setStep('pay');
+                setPendingPkgIndex(i);
+                setPurchaseAgreeOpen(true);
               }}
               className={`w-full p-4 rounded-lg border text-left transition-colors ${selected === i ? 'border-yellow-600 bg-yellow-600/10' : 'border-[rgba(255,255,255,0.08)] bg-[#161618] hover:border-[rgba(255,255,255,0.15)]'}`}
             >
@@ -172,7 +190,14 @@ export function BuyDoroCoinsModal({ open, onClose }: { open: boolean; onClose: (
                   I understand DoroCoins are virtual currency and purchases are non-refundable.
                 </span>
               </label>
-              <Button fullWidth disabled={!agree} onClick={handleAppleGoogleInfo}>
+              <Button
+                fullWidth
+                disabled={!agree}
+                onClick={() => {
+                  void logAgreement('dorocoin_purchase');
+                  handleAppleGoogleInfo();
+                }}
+              >
                 Confirm Purchase
               </Button>
             </div>

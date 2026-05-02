@@ -8,7 +8,7 @@ import { MOCK_CHALLENGES, MOCK_SUBMISSIONS, MOCK_WINNERS } from '@/lib/mock/data
 import { getStorage, setStorage } from '@/lib/storage';
 import type { Challenge, WinnerRecord } from '@/types';
 import { useState } from 'react';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
+import { WinnerClaimAgreement } from '@/components/agreements/WinnerClaimAgreement';
 import { toast } from 'sonner';
 import { Share2, Trophy } from 'lucide-react';
 
@@ -150,16 +150,7 @@ export function WinnerSpotlight() {
         </div>
       </div>
 
-      <AgreementModal open={claimOpen} onClose={() => setClaimOpen(false)} title="Winner Claim Agreement"
-        onAgree={handleClaim}>
-        <p className="mb-2">By claiming this prize, you confirm:</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>Your identity is accurate and verifiable.</li>
-          <li>You agree to verification before payout.</li>
-          <li>Prize payouts are subject to applicable tax regulations.</li>
-          <li>False claims may result in account suspension.</li>
-        </ul>
-      </AgreementModal>
+      <WinnerClaimAgreement isOpen={claimOpen} onCancel={() => setClaimOpen(false)} onConfirm={handleClaim} />
     </Section></Container>
   );
 }

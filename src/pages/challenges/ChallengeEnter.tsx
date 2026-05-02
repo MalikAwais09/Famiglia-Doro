@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { useWallet } from '@/context/WalletContext';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
+import { ChallengeEntryAgreement } from '@/components/agreements/ChallengeEntryAgreement';
+import { hasEntryAgreementSession } from '@/lib/supabase/agreements';
 import { toast } from 'sonner';
 import { Users } from 'lucide-react';
 import { getChallengeById } from '@/lib/supabase/challenges';
@@ -226,8 +227,13 @@ export function ChallengeEnter() {
           fullWidth 
           disabled={challenge.max_participants && challenge.current_participants >= challenge.max_participants}
           onClick={() => {
-            if (isFree) handleFreeEntry(); 
-            else {
+            const skipAgreement = hasEntryAgreementSession(challengeId);
+            if (isFree) {
+              if (skipAgreement) void handleFreeEntry();
+              else setTermsOpen(true);
+            } else if (skipAgreement) {
+              setPaymentOpen(true);
+            } else {
               setTermsOpen(true);
             }
           }} 
@@ -238,24 +244,17 @@ export function ChallengeEnter() {
             : (isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`)}
         </Button>
 
-        <AgreementModal open={termsOpen} onClose={() => { setTermsOpen(false); }} title="Challenge Entry Agreement"
-          onAgree={() => { 
-            setTermsOpen(false); 
-            if (isFree) handleFreeEntry(); 
-            else {
-              setPaymentOpen(true);
-            }
-          }}>
-          <p className="mb-2">By entering this challenge, you agree to:</p>
-          <ul className="list-disc list-inside space-y-1">
-            <li>Comply with all platform rules</li>
-            <li>Submit original work</li>
-            <li>Accept judging criteria</li>
-            <li>Understand submission may be public</li>
-            <li>Accept prize distribution terms (50/35/15)</li>
-            {!isFree && <li>Entry fee is non-refundable</li>}
-          </ul>
-        </AgreementModal>
+        <ChallengeEntryAgreement
+          challenge={challenge}
+          isPaid={!isFree}
+          isOpen={termsOpen}
+          onCancel={() => setTermsOpen(false)}
+          onConfirm={() => {
+            setTermsOpen(false);
+            if (isFree) void handleFreeEntry();
+            else setPaymentOpen(true);
+          }}
+        />
 
         {/* Payment Modal */}
         {paymentOpen && (

@@ -8,7 +8,7 @@ import { MOCK_WINNERS } from '@/lib/mock/data';
 import { getStorage, setStorage } from '@/lib/storage';
 import type { WinnerRecord } from '@/types';
 import { useState } from 'react';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
+import { WinnerClaimAgreement } from '@/components/agreements/WinnerClaimAgreement';
 import { toast } from 'sonner';
 
 export function ClaimPrize() {
@@ -80,16 +80,11 @@ export function ClaimPrize() {
         <Button variant="ghost" className="mt-4" onClick={() => navigate(-1)}>Go Back</Button>
       </div>
 
-      <AgreementModal open={claimOpen} onClose={() => setClaimOpen(false)} title="Winner Claim Agreement"
-        onAgree={handleClaim}>
-        <p className="mb-2">By claiming this prize, you agree:</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>Your identity is accurate and verifiable.</li>
-          <li>You will cooperate with any verification process.</li>
-          <li>Prize payouts are subject to verification and applicable tax regulations.</li>
-          <li>False claims may result in account suspension.</li>
-        </ul>
-      </AgreementModal>
+      <WinnerClaimAgreement
+        isOpen={claimOpen}
+        onCancel={() => setClaimOpen(false)}
+        onConfirm={handleClaim}
+      />
     </Section></Container>
   );
 }

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/context/AuthContext';
@@ -8,10 +8,8 @@ import { NotificationProvider } from '@/context/NotificationContext';
 import { AgreementProvider } from '@/context/AgreementContext';
 import { Layout } from '@/layout/Layout';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
-import { shouldShowGeo, getGeoMessage } from '@/lib/payment';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { GeoCompliancePopup } from '@/components/GeoCompliancePopup';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Lazy load all pages
@@ -42,42 +40,15 @@ const WinnersPage = lazy(() => import('@/pages/winners/WinnersPage').then(m => (
 const WinnerSpotlight = lazy(() => import('@/pages/winners/WinnerSpotlight').then(m => ({ default: m.WinnerSpotlight })));
 const Pricing = lazy(() => import('@/pages/Pricing').then(m => ({ default: m.Pricing })));
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
+const TermsOfService = lazy(() => import('@/pages/legal/TermsOfService').then(m => ({ default: m.TermsOfService })));
+const PrivacyPolicy = lazy(() => import('@/pages/legal/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
+const CommunityGuidelines = lazy(() => import('@/pages/legal/CommunityGuidelines').then(m => ({ default: m.CommunityGuidelines })));
 
 function SuspenseFallback() {
   return (
     <div className="min-h-screen bg-[#0E0E0F] flex items-center justify-center">
       <LoadingSpinner size="lg" />
     </div>
-  );
-}
-
-function GeoComplianceModal() {
-  const [open, setOpen] = useState(false);
-  const [geo, setGeo] = useState({ region: '', message: '' });
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    if (shouldShowGeo()) {
-      const info = getGeoMessage();
-      setGeo(info);
-      setOpen(true);
-    }
-  }, []);
-
-  return (
-    <Modal open={open} onClose={() => setOpen(false)} title="Regional Compliance Notice">
-      <div className="space-y-4">
-        <div className="bg-[#161618] rounded-md p-3">
-          <p className="text-xs text-[#9CA3AF] mb-1">Region: {geo.region}</p>
-          <p className="text-sm">{geo.message}</p>
-        </div>
-        <label className="flex items-start gap-2 cursor-pointer">
-          <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} className="mt-0.5 accent-yellow-600" />
-          <span className="text-sm">I have read and understand this notice.</span>
-        </label>
-        <Button fullWidth disabled={!checked} onClick={() => setOpen(false)}>Continue</Button>
-      </div>
-    </Modal>
   );
 }
 
@@ -91,7 +62,7 @@ export default function App() {
               <NotificationProvider>
               <AgreementProvider>
                 <Toaster theme="dark" position="bottom-right" richColors />
-                <GeoComplianceModal />
+                <GeoCompliancePopup />
                 <Suspense fallback={<SuspenseFallback />}>
                   <Routes>
                     <Route path="/" element={<SplashLogo />} />
@@ -100,6 +71,9 @@ export default function App() {
                     <Route path="/auth/sign-up" element={<SignUp />} />
                     <Route path="/auth/verify-code" element={<VerifyCode />} />
                     <Route path="/auth/success" element={<Success />} />
+                    <Route path="/legal/terms" element={<Suspense fallback={<SuspenseFallback />}><TermsOfService /></Suspense>} />
+                    <Route path="/legal/privacy" element={<Suspense fallback={<SuspenseFallback />}><PrivacyPolicy /></Suspense>} />
+                    <Route path="/legal/community-guidelines" element={<Suspense fallback={<SuspenseFallback />}><CommunityGuidelines /></Suspense>} />
                     <Route element={<Layout />}>
                       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                       <Route path="/feed" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
@@ -120,8 +94,8 @@ export default function App() {
                       <Route path="/tournaments" element={<ProtectedRoute><Tournaments /></ProtectedRoute>} />
                       <Route path="/winners" element={<ProtectedRoute><WinnersPage /></ProtectedRoute>} />
                       <Route path="/winners/:challengeId" element={<ProtectedRoute><WinnerSpotlight /></ProtectedRoute>} />
-                      <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
-                      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                     </Route>
                   </Routes>
                 </Suspense>

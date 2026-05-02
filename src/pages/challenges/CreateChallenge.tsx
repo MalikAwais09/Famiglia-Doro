@@ -14,6 +14,7 @@ import { Check, ChevronLeft, ChevronRight, Upload, X } from 'lucide-react';
 import { createChallenge, uploadCoverImage } from '@/lib/supabase/challenges';
 import { localDateTimeInputToUtcIso } from '@/lib/utils/dateUtils';
 import type { CreateChallengePayload, ChallengeFormat, PrizeType, LocationFormat, ScoringSystem } from '@/lib/supabase/types';
+import { ChallengeCreatorAgreement } from '@/components/agreements/ChallengeCreatorAgreement';
 
 const STEPS = ['Details', 'Format', 'Prize', 'Schedule', 'Rules'];
 
@@ -37,6 +38,7 @@ export function CreateChallenge() {
     inviteCode: '', visibility: 'invite_only' as const, restrictedUsers: '',
   });
   const [loading, setLoading] = useState(false);
+  const [creatorAgreementOpen, setCreatorAgreementOpen] = useState(false);
   const [promoImageName, setPromoImageName] = useState('');
   const [trailerVideoName, setTrailerVideoName] = useState('');
   const [flyerName, setFlyerName] = useState('');
@@ -369,12 +371,20 @@ export function CreateChallenge() {
               {step < 4 ? (
                 <Button onClick={() => canNext() && setStep(step + 1)} disabled={!canNext()}>Next <ChevronRight size={14} /></Button>
               ) : (
-                <Button loading={loading} onClick={handleSubmit}>Create Challenge</Button>
+                <Button loading={loading} onClick={() => setCreatorAgreementOpen(true)}>Create Challenge</Button>
               )}
             </div>
           </Card>
         </div>
       </Section>
+      <ChallengeCreatorAgreement
+        isOpen={creatorAgreementOpen}
+        onCancel={() => setCreatorAgreementOpen(false)}
+        onConfirm={() => {
+          setCreatorAgreementOpen(false);
+          void handleSubmit();
+        }}
+      />
     </Container>
   );
 }

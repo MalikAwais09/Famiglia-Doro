@@ -9,7 +9,9 @@ import { formatDateTime } from '@/lib/utils';
 import { formatRelativeTime, formatLocalDateTime, getTimeZoneName } from '@/lib/utils/dateUtils';
 import { Users, Share2, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
+import { ChallengeEntryAgreement } from '@/components/agreements/ChallengeEntryAgreement';
+import { SponsorAgreement } from '@/components/agreements/SponsorAgreement';
+import { setEntryAgreementSession } from '@/lib/supabase/agreements';
 import { Input } from '@/components/ui/Input';
 import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal';
 import {
@@ -46,6 +48,7 @@ export function ChallengeDetail() {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [participants, setParticipants] = useState<Pick<Profile, 'id' | 'name' | 'avatar_url' | 'role'>[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [entryAgreementOpen, setEntryAgreementOpen] = useState(false);
 
   const { refreshBalance } = useWallet();
   const { profile, user } = useAuth();
@@ -201,7 +204,7 @@ export function ChallengeDetail() {
         <Button
           fullWidth
           onClick={() => {
-            navigate(`/challenges/${id}/enter`);
+            setEntryAgreementOpen(true);
           }}
         >
           {isFreeLocal ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
@@ -534,17 +537,27 @@ export function ChallengeDetail() {
           </div>
         </div>
       </Section>
-      <AgreementModal open={sponsorOpen} onClose={() => setSponsorOpen(false)} onAgree={() => { toast.success('Sponsorship proposed'); setSponsorOpen(false); }} title="Sponsor Agreement">
-        <p className="mb-2">By proposing a sponsorship, you agree to the following terms:</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>Sponsor will fund the designated prize amount.</li>
-          <li>Default ROI split is 12% to sponsor, 3% to creator.</li>
-          <li>Both parties must agree before sponsorship is finalized.</li>
-          <li>Platform retains standard 15% fee.</li>
-          <li>Sponsorship terms are binding once confirmed.</li>
-          <li>Anti-fraud measures are in place.</li>
-        </ul>
-      </AgreementModal>
+      {challenge && (
+        <ChallengeEntryAgreement
+          challenge={challenge}
+          isPaid={ !(challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0)}
+          isOpen={entryAgreementOpen}
+          onCancel={() => setEntryAgreementOpen(false)}
+          onConfirm={() => {
+            if (challenge?.id) setEntryAgreementSession(challenge.id);
+            setEntryAgreementOpen(false);
+            navigate(`/challenges/${id}/enter`);
+          }}
+        />
+      )}
+      <SponsorAgreement
+        isOpen={sponsorOpen}
+        onCancel={() => setSponsorOpen(false)}
+        onConfirm={() => {
+          toast.success('Sponsorship proposed');
+          setSponsorOpen(false);
+        }}
+      />
       <SubmissionFormModal
         open={submitOpen}
         onClose={() => setSubmitOpen(false)}

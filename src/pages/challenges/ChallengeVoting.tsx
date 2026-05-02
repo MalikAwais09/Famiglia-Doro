@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container } from '@/layout/Container';
 import { Section } from '@/layout/Section';
@@ -11,12 +11,13 @@ import { useWallet } from '@/context/WalletContext';
 import { timeAgo } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Heart, ExternalLink, CreditCard, Wallet, ChevronLeft, AlertCircle, Loader2 } from 'lucide-react';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
+import { PaidVotingAgreement } from '@/components/agreements/PaidVotingAgreement';
+import { AntiFraudAcknowledgement } from '@/components/agreements/AntiFraudAcknowledgement';
+import { recordVoteAttempt } from '@/lib/antiFraud';
+import { hasPaidVoteAckThisSession, setPaidVoteAckThisSession } from '@/lib/supabase/agreements';
 import { getSubmissions } from '@/lib/supabase/submissions';
 import { getVoteStatus, castVote } from '@/lib/supabase/votes';
 import type { Submission } from '@/lib/supabase/types';
-import { Heart, ExternalLink, CreditCard, Wallet, ChevronLeft, AlertCircle } from 'lucide-react';
-import { AgreementModal } from '@/components/agreements/AgreementModal';
 
 export function ChallengeVoting() {
   const { id } = useParams();
@@ -33,6 +34,24 @@ export function ChallengeVoting() {
   const [cardLoading, setCardLoading] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [paidVoteTarget, setPaidVoteTarget] = useState<string | null>(null);
+  const [antiFraudOpen, setAntiFraudOpen] = useState(false);
+  const pendingVote = useRef<(() => Promise<void>) | null>(null);
+
+  const runVoteAttempt = (fn: () => Promise<void>) => {
+    if (recordVoteAttempt()) {
+      pendingVote.current = fn;
+      setAntiFraudOpen(true);
+      return;
+    }
+    void fn();
+  };
+
+  const continueAfterAntiFraud = async () => {
+    setAntiFraudOpen(false);
+    const fn = pendingVote.current;
+    pendingVote.current = null;
+    if (fn) await fn();
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -65,12 +84,12 @@ export function ChallengeVoting() {
     : [...submissions].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const totalVotes = submissions.reduce((s, sub) => s + sub.votes_count, 0);
 
-  const handleFreeVote = async (subId: string) => {
+  const executeFreeVote = async (subId: string) => {
     try {
       const res = await castVote(subId, false);
-      setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, votes_count: res.newVoteCount } : s));
+      setSubmissions((prev) => prev.map((s) => (s.id === subId ? { ...s, votes_count: res.newVoteCount } : s)));
       setFreeVoteUsed(true);
-      setVotedSubIds(prev => new Set(prev).add(subId));
+      setVotedSubIds((prev) => new Set(prev).add(subId));
       toast.success('Free vote recorded');
     } catch (err: any) {
       if (err.code === 'free_vote_used') {
@@ -82,18 +101,18 @@ export function ChallengeVoting() {
     }
   };
 
-  const openPaidVote = (subId: string) => {
-    setPaidVoteTarget(subId);
-    setTermsOpen(true);
-  };
+  const handleFreeVote = (subId: string) => runVoteAttempt(() => executeFreeVote(subId));
 
-  const handlePaidVoteDoroCoin = async () => {
-    if (!paidVoteTarget) return;
+  const executePaidVote = async (subId: string) => {
+    if (balance < 1) {
+      toast.error('Insufficient DoroCoins. You need at least 1 DC.');
+      return;
+    }
     try {
-      const res = await castVote(paidVoteTarget, true);
+      const res = await castVote(subId, true);
       await refreshBalance();
-      setSubmissions(prev => prev.map(s => s.id === paidVoteTarget ? { ...s, votes_count: res.newVoteCount } : s));
-      setVotedSubIds(prev => new Set(prev).add(paidVoteTarget));
+      setSubmissions((prev) => prev.map((s) => (s.id === subId ? { ...s, votes_count: res.newVoteCount } : s)));
+      setVotedSubIds((prev) => new Set(prev).add(subId));
       toast.success('Vote recorded — 1 DoroCoin spent');
     } catch (err: any) {
       toast.error(err.message || 'Failed to cast paid vote');
@@ -102,6 +121,28 @@ export function ChallengeVoting() {
       setPaymentStep('choose');
       setPaidVoteTarget(null);
     }
+  };
+
+  const openPaidVote = (subId: string) => {
+    setPaidVoteTarget(subId);
+    if (id && hasPaidVoteAckThisSession(id)) {
+      runVoteAttempt(() => executePaidVote(subId));
+      return;
+    }
+    setTermsOpen(true);
+  };
+
+  const onPaidAgreementConfirm = () => {
+    setTermsOpen(false);
+    const target = paidVoteTarget;
+    if (!target || !id) return;
+    if (balance < 1) {
+      toast.error('Insufficient DoroCoins. You need at least 1 DC.');
+      setPaidVoteTarget(null);
+      return;
+    }
+    setPaidVoteAckThisSession(id);
+    runVoteAttempt(() => executePaidVote(target));
   };
 
   return (
@@ -194,30 +235,20 @@ export function ChallengeVoting() {
       </>
       )}
 
-      {/* Paid Voting Agreement Modal (DoroCoin flow) */}
-      <AgreementModal
-        open={termsOpen}
-        onClose={() => { setTermsOpen(false); setPaidVoteTarget(null); }}
-        title="Paid Voting Agreement"
-        onAgree={() => {
-          setTermsOpen(false);
-          if (paidVoteTarget) {
-            if (balance < 1) {
-              toast.error('Insufficient DoroCoins. You need at least 1 DC.');
-            } else {
-              handlePaidVoteDoroCoin();
-            }
-          }
+      <PaidVotingAgreement
+        isOpen={termsOpen}
+        balanceLabel={`${balance} DC`}
+        onCancel={() => { setTermsOpen(false); setPaidVoteTarget(null); }}
+        onConfirm={onPaidAgreementConfirm}
+      />
+      <AntiFraudAcknowledgement
+        isOpen={antiFraudOpen}
+        onConfirm={continueAfterAntiFraud}
+        onCancel={() => {
+          setAntiFraudOpen(false);
+          pendingVote.current = null;
         }}
-      >
-        <p className="mb-2">By purchasing a vote, you agree:</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>Each paid vote costs 1 DoroCoin.</li>
-          <li>Paid votes are non-refundable.</li>
-          <li>Votes are final and cannot be changed.</li>
-          <li>Your current balance: <span className="text-yellow-500 font-medium">{balance} DC</span></li>
-        </ul>
-      </AgreementModal>
+      />
 
       {/* Card Payment Modal */}
       {selectedSub && (
@@ -253,21 +284,12 @@ export function ChallengeVoting() {
                     <p className="text-xs text-red-400">Insufficient balance. You need 1 DoroCoin. Buy more from your wallet.</p>
                   </div>
                 )}
-                <Button fullWidth loading={cardLoading} disabled={balance < 1} onClick={async () => {
-                  setCardLoading(true);
-                  if (selectedSub) {
-                    try {
-                      const res = await castVote(selectedSub, true);
-                      await refreshBalance();
-                      setSubmissions(prev => prev.map(s => s.id === selectedSub ? { ...s, votes_count: res.newVoteCount } : s));
-                      setVotedSubIds(prev => new Set(prev).add(selectedSub));
-                      toast.success('Vote recorded — 1 DoroCoin spent');
-                      setSelectedSub(null);
-                      setPaymentStep('choose');
-                    } catch (err: any) {
-                      toast.error(err.message || 'Failed to cast paid vote');
-                    }
-                  }
+                <Button fullWidth loading={cardLoading} disabled={balance < 1} onClick={() => {
+                  if (!selectedSub) return;
+                  const subId = selectedSub;
+                  setSelectedSub(null);
+                  setPaymentStep('choose');
+                  openPaidVote(subId);
                   setCardLoading(false);
                 }}>
                   Confirm — Pay 1 DC
