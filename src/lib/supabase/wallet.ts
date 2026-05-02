@@ -25,20 +25,25 @@ export type DeductCoinsResult =
 
 // ── getBalance ────────────────────────────────────────────────────────────
 export async function getBalance(): Promise<number> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) {
-    throw new Error('Not authenticated');
+  if (import.meta.env.DEV) {
+    console.log('getBalance called');
   }
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) return 0;
 
   const { data, error } = await supabase
     .from('profiles')
     .select('dorocoin_balance')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
-  if (error) throw error;
+  if (import.meta.env.DEV) {
+    console.log('getBalance result:', data, error);
+  }
+  if (error) return 0;
   return data?.dorocoin_balance ?? 0;
 }
 
@@ -48,10 +53,10 @@ export async function getTransactions(
   limit: number = 20,
 ): Promise<WalletTransactionsPage> {
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) {
-    throw new Error('Not authenticated');
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { transactions: [], total: 0, page, limit };
   }
 
   const from = (page - 1) * limit;
@@ -60,11 +65,14 @@ export async function getTransactions(
   const { data, error, count } = await supabase
     .from('wallet_transactions')
     .select('*', { count: 'exact' })
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .range(from, to);
 
-  if (error) throw error;
+  if (error) {
+    console.error('getTransactions error:', error);
+    return { transactions: [], total: 0, page, limit };
+  }
 
   return {
     transactions: (data ?? []) as WalletTransaction[],

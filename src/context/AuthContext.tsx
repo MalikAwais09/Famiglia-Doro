@@ -147,6 +147,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [ensureProfile]);
 
+  // Realtime profile updates (balance, role, ban flag, etc.)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('profile_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if ((import.meta as any)?.env?.DEV) {
+            console.log('Profile updated:', payload.new);
+          }
+          setProfile(payload.new as UserProfile);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   // ── signIn ──────────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
     const { user: authUser, session: authSession, error } = await authSignIn(email, password);

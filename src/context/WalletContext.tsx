@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import {
-  getBalance,
   getTransactions,
   getDoroCoinPackages,
   deductCoins as walletDeductCoins,
@@ -21,49 +20,62 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const [balance, setBalance] = useState(0);
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
   const packages = getDoroCoinPackages();
 
-  const refreshBalance = useCallback(async () => {
+  // Balance comes directly from AuthContext profile to avoid stuck spinners / extra queries.
+  const balance = profile?.dorocoin_balance ?? 0;
+  const loading = authLoading;
+
+  if (import.meta.env.DEV) {
+    console.log('=== WALLET DEBUG ===');
+    console.log('User:', user?.id);
+    console.log('Loading:', loading);
+    console.log('Balance:', balance);
+  }
+
+  const refreshTransactions = useCallback(async () => {
     if (!user) {
-      setBalance(0);
       setTransactions([]);
-      setLoading(false);
       return;
     }
-
-    setLoading(true);
     try {
-      const nextBalance = await getBalance();
-      setBalance(nextBalance);
       const page = await getTransactions(1, 20);
       setTransactions(page.transactions);
     } catch (err) {
-      console.error('Failed to refresh wallet:', err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to refresh wallet transactions:', err);
+      setTransactions([]);
     }
   }, [user]);
 
+  const refreshBalance = useCallback(async () => {
+    if (!user) return;
+    // Re-fetch profile so dorocoin_balance updates immediately in UI.
+    await refreshProfile();
+    // Keep transactions fresh too (used in dropdown).
+    await refreshTransactions();
+  }, [user, refreshProfile, refreshTransactions]);
+
   useEffect(() => {
-    refreshBalance();
-  }, [refreshBalance]);
+    if (authLoading) return;
+    if (!user) {
+      setTransactions([]);
+      return;
+    }
+    void refreshTransactions();
+  }, [user, authLoading, refreshTransactions]);
 
   const deductCoins = useCallback(
     async (amount: number, description?: string): Promise<boolean> => {
       if (!user?.id) return false;
       const result = await walletDeductCoins(user.id, amount, description ?? '');
       if (result.success) {
-        setBalance(result.newBalance);
+        // Balance will be pushed by profile refresh / realtime; update transactions optimistically.
         try {
           const page = await getTransactions(1, 20);
           setTransactions(page.transactions);
-        } catch {
-          /* ignore list refresh errors */
-        }
+        } catch {}
         return true;
       }
       return false;
