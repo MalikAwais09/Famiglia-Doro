@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { formatDateTime } from '@/lib/utils';
-import { formatRelativeTime, getTimeZoneName } from '@/lib/utils/dateUtils';
+import { formatRelativeTime, formatLocalDateTime, getTimeZoneName } from '@/lib/utils/dateUtils';
 import { Users, Share2, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { AgreementModal } from '@/components/agreements/AgreementModal';
@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/Input';
 import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal';
 import { getChallengeById } from '@/lib/supabase/challenges';
 import { getMyEntry, withdrawEntry, getPublicParticipants } from '@/lib/supabase/entries';
+import { getMySubmission } from '@/lib/supabase/submissions';
+import { useAuth } from '@/context/AuthContext';
 import { getComments, postComment, type Comment } from '@/lib/supabase/comments';
 import type { Challenge, Profile } from '@/lib/supabase/types';
 import { useWallet } from '@/context/WalletContext';
@@ -33,8 +35,10 @@ export function ChallengeDetail() {
   const [submitOpen, setSubmitOpen] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [participants, setParticipants] = useState<Pick<Profile, 'id' | 'name' | 'avatar_url' | 'role'>[]>([]);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const { refreshBalance } = useWallet();
+  const { profile } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +59,8 @@ export function ChallengeDetail() {
           setMyEntry(entry);
           setHasEntered(!!entry);
         }
+        const submission = entry ? await getMySubmission(id) : null;
+        if (!cancelled) setHasSubmitted(!!submission);
         // Fetch comments
         const comms = await getComments(id);
         if (!cancelled) setComments(comms);
@@ -115,6 +121,7 @@ export function ChallengeDetail() {
 
   const isFree = challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0;
   const totalPool = challenge.entry_fee * challenge.current_participants;
+  const isCreator = !!profile?.id && profile.id === challenge.created_by;
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -147,6 +154,17 @@ export function ChallengeDetail() {
     const isRegistrationOver = challenge?.registration_deadline && new Date(challenge.registration_deadline).getTime() < now;
     const isStarted = challenge?.start_date && new Date(challenge.start_date).getTime() <= now;
     const isEnded = challenge?.end_date && new Date(challenge.end_date).getTime() <= now;
+    const startMs = challenge?.start_date ? new Date(challenge.start_date).getTime() : null;
+    const endMs = challenge?.end_date ? new Date(challenge.end_date).getTime() : null;
+    const beforeStart = startMs !== null && now < startMs;
+    const afterEnd = endMs !== null && now > endMs;
+    const canSubmit =
+      hasEntered &&
+      !hasSubmitted &&
+      !beforeStart &&
+      !afterEnd &&
+      challenge?.phase !== 'voting' &&
+      challenge?.phase !== 'completed';
 
     if (hasEntered) {
       if (challenge?.phase === 'completed') {
@@ -167,9 +185,19 @@ export function ChallengeDetail() {
 
       return (
         <div className="space-y-2">
-          <Button fullWidth onClick={() => setSubmitOpen(true)}>
-            {isStarted ? 'Submit Your Work' : 'Start Challenge (Submit Work)'}
-          </Button>
+          {hasSubmitted ? (
+            <p className="text-xs text-emerald-400 text-center">You have submitted your work.</p>
+          ) : beforeStart && challenge.start_date ? (
+            <div className="text-xs text-[#9CA3AF] space-y-1 text-center">
+              <p>Submissions open in:</p>
+              <p>{formatRelativeTime(challenge.start_date)}</p>
+              <p>{formatLocalDateTime(challenge.start_date)}</p>
+            </div>
+          ) : afterEnd ? (
+            <p className="text-xs text-red-400 text-center">Submission deadline has passed.</p>
+          ) : canSubmit ? (
+            <Button fullWidth onClick={() => setSubmitOpen(true)}>Submit Your Work</Button>
+          ) : null}
           <Button fullWidth variant="secondary" onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>
           {!isStarted && (
             <Button fullWidth variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" loading={withdrawLoading} onClick={handleWithdraw}>Withdraw Entry</Button>
@@ -194,6 +222,13 @@ export function ChallengeDetail() {
       case 'upcoming':
         return <Button disabled fullWidth>Registration opens soon</Button>;
       case 'entry_open':
+        if (isCreator) {
+          return (
+            <div className="w-full flex justify-center">
+              <Badge>You created this challenge</Badge>
+            </div>
+          );
+        }
         return (
           <Button 
             fullWidth 

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Users } from 'lucide-react';
 import { getChallengeById } from '@/lib/supabase/challenges';
 import { enterChallenge, getMyEntry } from '@/lib/supabase/entries';
+import { supabase } from '@/lib/supabase/client';
 import type { Challenge } from '@/lib/supabase/types';
 
 export function ChallengeEnter() {
@@ -41,6 +42,14 @@ export function ChallengeEnter() {
         if (!data) {
           toast.error('Challenge not found');
           navigate('/challenges');
+          return;
+        }
+
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData.user?.id;
+        if (uid && data.created_by === uid) {
+          toast.error('You cannot enter your own challenge');
+          navigate(`/challenges/${challengeId}`);
           return;
         }
 

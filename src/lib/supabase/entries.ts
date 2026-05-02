@@ -1,5 +1,6 @@
 import { supabase } from './client';
-import type { Entry, Profile } from './types';
+import { computePhase } from './challenges';
+import type { Entry, Profile, Challenge, ChallengePhase, Submission } from './types';
 
 // ── enterChallenge ────────────────────────────────────────────────────────
 export async function enterChallenge(challengeId: string): Promise<Entry> {
@@ -10,11 +11,15 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
   // Check challenge state
   const { data: challenge, error: challengeError } = await supabase
     .from('challenges')
-    .select('id, phase, entry_fee, current_participants, max_participants, title, created_by, registration_deadline')
+    .select('id, phase, entry_fee, current_participants, max_participants, title, created_by, registration_deadline, start_date, end_date, voting_end_date')
     .eq('id', challengeId)
     .single();
 
   if (challengeError || !challenge) throw new Error('Challenge not found');
+
+  if (challenge.created_by === userId) {
+    throw new Error('You cannot enter your own challenge');
+  }
   
   // Timing check
   const now = new Date();
@@ -23,9 +28,16 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
     throw new Error('Registration for this challenge has closed');
   }
 
-  if (challenge.phase !== 'entry_open') throw new Error('Challenge is not open for entries');
-  if (challenge.max_participants && challenge.current_participants >= challenge.max_participants) {
-    throw new Error(`This challenge is full (${challenge.max_participants}/${challenge.max_participants} participants)`);
+  const { count: existingEntryCount } = await supabase
+    .from('entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('challenge_id', challengeId);
+  const realParticipantCount = existingEntryCount ?? 0;
+
+  const effectivePhase = computePhase(challenge);
+  if (effectivePhase !== 'entry_open') throw new Error('Challenge is not open for entries');
+  if (challenge.max_participants && realParticipantCount >= challenge.max_participants) {
+    throw new Error(`This challenge is full (${realParticipantCount}/${challenge.max_participants} participants)`);
   }
 
   // Check if already entered
@@ -101,14 +113,93 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
   // Notify creator (if not self)
   if (challenge.created_by !== userId) {
     const { data: me } = await supabase.from('profiles').select('name').eq('id', userId).single();
-    await supabase.from('notifications').insert({
+    const { error: notifError } = await supabase.from('notifications').insert({
       user_id: challenge.created_by,
-      title: 'New Entry',
-      message: `${me?.name || 'Someone'} joined your challenge ${challenge.title}`
+      title: 'New Participant!',
+      message: `${me?.name || 'Someone'} just joined your challenge "${challenge.title}"`,
+      type: 'new_entry',
+      is_read: false,
     });
+    if (notifError) {
+      console.error('Notification insert failed:', notifError);
+    }
   }
 
   return entry as Entry;
+}
+
+// ── My entry list (for My Entries page) ───────────────────────────────────
+export type MyEntryListItem = {
+  entryId: string;
+  entryFeePaid: number;
+  enteredAt: string;
+  challenge: (Challenge & { creator?: Pick<Profile, 'name' | 'avatar_url'> | null }) | null;
+  submission: Pick<Submission, 'id' | 'title' | 'content_type' | 'votes_count' | 'is_winner' | 'placement'> | null;
+  hasSubmitted: boolean;
+  isWinner: boolean;
+  placement: number | null;
+};
+
+export async function getMyEntries(): Promise<MyEntryListItem[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from('entries')
+    .select(`
+      id,
+      entry_fee_paid,
+      created_at,
+      challenges (
+        id,
+        title,
+        category,
+        cover_image_url,
+        phase,
+        start_date,
+        end_date,
+        voting_end_date,
+        entry_fee,
+        prize_type,
+        format,
+        created_by,
+        creator:profiles!challenges_created_by_fkey (name, avatar_url)
+      ),
+      submissions (
+        id,
+        title,
+        content_type,
+        votes_count,
+        is_winner,
+        placement
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getMyEntries error:', error);
+    return [];
+  }
+
+  return (data || []).map((row: any) => {
+    const ch = row.challenges as Challenge | null;
+    const subs = Array.isArray(row.submissions) ? row.submissions : row.submissions ? [row.submissions] : [];
+    const sub = subs[0] ?? null;
+    const phase = ch ? computePhase(ch) : ('entry_open' as ChallengePhase);
+    const challengeWithPhase = ch ? { ...ch, phase } : null;
+    return {
+      entryId: row.id,
+      entryFeePaid: row.entry_fee_paid,
+      enteredAt: row.created_at,
+      challenge: challengeWithPhase,
+      submission: sub,
+      hasSubmitted: subs.length > 0,
+      isWinner: sub?.is_winner ?? false,
+      placement: sub?.placement ?? null,
+    };
+  });
 }
 
 // ── withdrawEntry ─────────────────────────────────────────────────────────

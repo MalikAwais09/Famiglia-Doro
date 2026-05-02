@@ -1,6 +1,17 @@
 import { supabase } from './client';
 import type { Challenge, ChallengePhase, ChallengeFilters, CreateChallengePayload, UpdateChallengePayload } from './types';
 
+// ── getEntryCountForChallenge ─────────────────────────────────────────────
+export async function getEntryCountForChallenge(challengeId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('challenge_id', challengeId);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 // ── computePhase ──────────────────────────────────────────────────────────
 export function computePhase(challenge: any): ChallengePhase {
   // Use timestamps for reliable comparison across timezones
@@ -56,10 +67,23 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
 
   if (error) throw error;
 
-  let challenges = (data || []).map(ch => ({
-    ...ch,
-    phase: computePhase(ch)
-  })) as Challenge[];
+  const rows = data || [];
+  const counts = await Promise.all(
+    rows.map(async (ch) => {
+      const n = await getEntryCountForChallenge(ch.id);
+      return [ch.id, n] as const;
+    })
+  );
+  const countById = Object.fromEntries(counts) as Record<string, number>;
+
+  let challenges = rows.map((ch) => {
+    const current_participants = countById[ch.id] ?? 0;
+    return {
+      ...ch,
+      current_participants,
+      phase: computePhase({ ...ch, current_participants }),
+    };
+  }) as Challenge[];
 
   if (filters?.phase) {
     challenges = challenges.filter(c => c.phase === filters.phase);
@@ -84,9 +108,12 @@ export async function getChallengeById(id: string): Promise<Challenge> {
   if (error) throw error;
   if (!data) throw new Error('Challenge not found');
 
+  const current_participants = await getEntryCountForChallenge(id);
+
   return {
     ...data,
-    phase: computePhase(data),
+    current_participants,
+    phase: computePhase({ ...data, current_participants }),
     rules: data.rules || [],
   } as Challenge;
 }

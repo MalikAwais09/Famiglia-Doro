@@ -1,4 +1,5 @@
 import { supabase } from './client';
+import { formatLocalDateTime } from '@/lib/utils/dateUtils';
 import type { Submission, ContentType, Profile } from './types';
 
 interface SubmitWorkData {
@@ -15,15 +16,27 @@ export async function submitWork(challengeId: string, data: SubmitWorkData): Pro
   const userId = sessionData.session?.user?.id;
   if (!userId) throw new Error('Not authenticated');
 
-  // Verify challenge timing and phase
   const { data: challenge } = await supabase
     .from('challenges')
-    .select('title, created_by, end_date, phase')
+    .select('title, created_by, start_date, end_date, phase')
     .eq('id', challengeId)
     .single();
 
-  if (challenge && challenge.end_date && new Date() > new Date(challenge.end_date)) {
-    throw new Error('Submission period has ended for this challenge.');
+  if (!challenge) throw new Error('Challenge not found');
+
+  const nowMs = Date.now();
+
+  if (challenge.start_date) {
+    const startMs = new Date(challenge.start_date).getTime();
+    if (nowMs < startMs) {
+      throw new Error(
+        `Submissions open on ${formatLocalDateTime(challenge.start_date)}. Please wait until the challenge starts.`
+      );
+    }
+  }
+
+  if (challenge.end_date && nowMs > new Date(challenge.end_date).getTime()) {
+    throw new Error('Submission deadline has passed for this challenge.');
   }
 
   // Verify entry
@@ -83,14 +96,18 @@ export async function submitWork(challengeId: string, data: SubmitWorkData): Pro
 
   if (submitError) throw submitError;
 
-  // Notify creator
-  if (challenge && challenge.created_by !== userId) {
+  if (challenge.created_by !== userId) {
     const { data: me } = await supabase.from('profiles').select('name').eq('id', userId).single();
-    await supabase.from('notifications').insert({
+    const { error: notifError } = await supabase.from('notifications').insert({
       user_id: challenge.created_by,
       title: 'New Submission',
-      message: `${me?.name || 'Someone'} submitted to your challenge ${challenge.title}`
+      message: `${me?.name || 'Someone'} submitted to your challenge ${challenge.title}`,
+      type: 'new_submission',
+      is_read: false,
     });
+    if (notifError) {
+      console.error('Notification insert failed:', notifError);
+    }
   }
 
   return submission as Submission;

@@ -357,6 +357,8 @@ CREATE POLICY "wallet_insert_own" ON public.wallet_transactions FOR INSERT WITH 
 
 CREATE POLICY "notifications_select_own" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "notifications_update_own" ON public.notifications FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "notifications_insert_authenticated" ON public.notifications FOR INSERT TO authenticated
+  WITH CHECK (true);
 
 -- ============================================================
 -- RLS POLICIES: AGREEMENTS
