@@ -281,6 +281,50 @@ export function ChallengeDetail() {
 
   const rulesArray = Array.isArray(challenge?.rules) ? challenge.rules.map(r => r?.rule_text).filter(Boolean) : [];
 
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = challenge?.title || 'Famiglia Doro Challenge';
+    const text = challenge?.description || 'Check out this challenge on Famiglia Doro!';
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          console.error('Error sharing:', err);
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard');
+      } catch (err) {
+        console.error('Error copying link:', err);
+        toast.error('Failed to copy link');
+      }
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!id || !myEntry?.id) return;
+    if (!confirm('Are you sure you want to withdraw? Any entry fee paid will be refunded.')) return;
+
+    setWithdrawLoading(true);
+    try {
+      const { refunded } = await withdrawEntry(id, myEntry.id);
+      setHasEntered(false);
+      setMyEntry(null);
+      setParticipants(prev => prev.filter(p => p.id !== profile?.id));
+      setChallenge(prev => prev ? { ...prev, current_participants: Math.max(0, prev.current_participants - 1) } : null);
+      refreshBalance();
+      toast.success(`Withdrawn successfully.${refunded > 0 ? ` Refunded ${refunded} DC.` : ''}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to withdraw');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
   return (
     <Container>
       <Section>
