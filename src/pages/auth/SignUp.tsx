@@ -27,128 +27,133 @@ const schema = z
     path: ['confirmPassword'],
   });
 
-type Form = z.infer<typeof schema>;
+type SignUpFormData = z.infer<typeof schema>;
 
 export function SignUp() {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<Form>({ resolver: zodResolver(schema) });
+  } = useForm<SignUpFormData>({ resolver: zodResolver(schema) });
+
   const [loading, setLoading] = useState(false);
-  const [masterOpen, setMasterOpen] = useState(false);
-  const [pending, setPending] = useState<Form | null>(null);
+  const [showAgreement, setShowAgreement] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<SignUpFormData | null>(null);
+
   const navigate = useNavigate();
   const { signUp } = useAuth();
 
-  const finalizeSignUp = async (data: Form) => {
+  const onSubmit = (data: SignUpFormData) => {
+    setPendingFormData(data);
+    setShowAgreement(true);
+  };
+
+  /** Runs only after Master Account checkbox + confirm inside the modal. */
+  const handleAgreementConfirmed = async () => {
+    setShowAgreement(false);
+    const data = pendingFormData;
+    setPendingFormData(null);
+    if (!data) return;
+
     setLoading(true);
     const { error } = await signUp(data.name, data.email, data.password);
     setLoading(false);
+
     if (error) {
       toast.error(error.message || 'Sign up failed. Please try again.');
       return;
     }
+
     await logAgreement('master_account').catch(() => {
       console.warn('master_account agreement log skipped or failed — profile may not be ready yet');
     });
+
     sessionStorage.setItem('signup_email', data.email);
     sessionStorage.setItem('signup_name', data.name);
     toast.success('Account created! Please check your email for a confirmation link.');
     navigate('/auth/success');
   };
 
-  const onSubmitForm = async (data: Form) => {
-    setPending(data);
-    setMasterOpen(true);
-  };
-
-  const onMasterConfirm = async () => {
-    setMasterOpen(false);
-    if (!pending) return;
-    await finalizeSignUp(pending);
-    setPending(null);
-  };
-
-  const onMasterCancel = () => {
-    setMasterOpen(false);
-    setPending(null);
-  };
-
   return (
-    <div className="min-h-screen bg-[#0E0E0F] flex items-center justify-center px-4 py-8">
-      <MasterAccountAgreement
-        isOpen={masterOpen}
-        onConfirm={onMasterConfirm}
-        onCancel={onMasterCancel}
-      />
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-full border-2 border-yellow-600 overflow-hidden mx-auto mb-3">
-            <img
-              src="https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg"
-              alt=""
-              className="w-full h-full object-cover"
-            />
+    <>
+      <div className="min-h-screen bg-[#0E0E0F] flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-full border-2 border-yellow-600 overflow-hidden mx-auto mb-3">
+              <img
+                src="https://res.cloudinary.com/drefcs4o2/image/upload/v1775267495/logo-gold_chstxw.jpg"
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h1 className="text-2xl font-bold">Create Account</h1>
           </div>
-          <h1 className="text-2xl font-bold">Create Account</h1>
-        </div>
-        <div className="space-y-4">
-          <SocialAuthButtons />
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
-            <span className="text-xs text-[#6B7280]">or sign up with email</span>
-            <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
-          </div>
-          <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-3">
-            <Input label="Full Name" placeholder="John Doe" error={errors.name?.message} {...register('name')} />
-            <Input label="Email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
-            <Input
-              label="Password"
-              type="password"
-              placeholder="Min 8 chars, uppercase, number"
-              error={errors.password?.message}
-              {...register('password')}
-            />
-            <Input
-              label="Confirm Password"
-              type="password"
-              placeholder="Repeat password"
-              error={errors.confirmPassword?.message}
-              {...register('confirmPassword')}
-            />
-            <p className="text-[11px] text-[#6B7280]">
-              You will review our{' '}
-              <Link to="/legal/terms" className="text-yellow-500 hover:underline" target="_blank" rel="noopener noreferrer">
-                Terms
+          <div className="space-y-4">
+            <SocialAuthButtons />
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
+              <span className="text-xs text-[#6B7280]">or sign up with email</span>
+              <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
+            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+              <Input label="Full Name" placeholder="John Doe" error={errors.name?.message} {...register('name')} />
+              <Input label="Email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
+              <Input
+                label="Password"
+                type="password"
+                placeholder="Min 8 chars, uppercase, number"
+                error={errors.password?.message}
+                {...register('password')}
+              />
+              <Input
+                label="Confirm Password"
+                type="password"
+                placeholder="Repeat password"
+                error={errors.confirmPassword?.message}
+                {...register('confirmPassword')}
+              />
+              <p className="text-[11px] text-[#6B7280]">
+                You will review our{' '}
+                <Link to="/legal/terms" className="text-yellow-500 hover:underline" target="_blank" rel="noopener noreferrer">
+                  Terms
+                </Link>
+                ,{' '}
+                <Link to="/legal/privacy" className="text-yellow-500 hover:underline" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </Link>
+                , and{' '}
+                <Link
+                  to="/legal/community-guidelines"
+                  className="text-yellow-500 hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Community Guidelines
+                </Link>{' '}
+                before account creation completes.
+              </p>
+              <Button type="submit" fullWidth loading={loading}>
+                Create Account
+              </Button>
+            </form>
+            <p className="text-center text-sm text-[#9CA3AF]">
+              Already have an account?{' '}
+              <Link to="/auth/sign-in" className="text-yellow-500 hover:underline">
+                Sign in
               </Link>
-              ,{' '}
-              <Link to="/legal/privacy" className="text-yellow-500 hover:underline" target="_blank" rel="noopener noreferrer">
-                Privacy Policy
-              </Link>
-              , and{' '}
-              <Link
-                to="/legal/community-guidelines"
-                className="text-yellow-500 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Community Guidelines
-              </Link>{' '}
-              before account creation completes.
             </p>
-            <Button type="submit" fullWidth loading={loading}>
-              Continue
-            </Button>
-          </form>
-          <p className="text-center text-sm text-[#9CA3AF]">
-            Already have an account?{' '}
-            <Link to="/auth/sign-in" className="text-yellow-500 hover:underline">
-              Sign in
-            </Link>
-          </p>
+          </div>
         </div>
       </div>
-    </div>
+
+      <MasterAccountAgreement
+        isOpen={showAgreement}
+        onConfirm={handleAgreementConfirmed}
+        onCancel={() => {
+          setShowAgreement(false);
+          setPendingFormData(null);
+        }}
+      />
+    </>
   );
 }

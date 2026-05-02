@@ -48,7 +48,12 @@ export function AgreementModal({
   slotBeforeLegal,
   logOnConfirm = true,
 }: AgreementModalProps) {
-  const visible = open ?? isOpen ?? false;
+  const visible = !!(open ?? isOpen);
+
+  if (import.meta.env.DEV) {
+    console.log('AgreementModal render — visible:', visible, 'open:', open, 'isOpen:', isOpen);
+  }
+
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
   const [logging, setLogging] = useState(false);
@@ -101,6 +106,8 @@ export function AgreementModal({
   const handleClose = () => {
     if (onCancel) onCancel();
   };
+
+  if (!visible) return null;
 
   return (
     <Modal open={visible} onClose={handleClose} title={title} subtitle={description}>
