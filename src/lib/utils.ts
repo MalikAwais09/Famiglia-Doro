@@ -66,6 +66,7 @@ export function getDaysUntil(dateStr: string): number {
 }
 
 export function getTimeUntil(dateStr: string): string {
+  if (!dateStr) return 'N/A';
   const diff = new Date(dateStr).getTime() - Date.now();
   if (diff <= 0) return 'Started';
   const days = Math.floor(diff / 86400000);
@@ -121,18 +122,32 @@ export const addDays = (date: Date, days: number): Date => {
   return result;
 };
 
-export const computeChallengePhase = (challenge: Challenge): Challenge['phase'] => {
+export const computeChallengePhase = (challenge: any): Challenge['phase'] => {
   const now = Date.now();
-  if (now < new Date(challenge.registrationDeadline).getTime()) return 'entry_open';
-  if (now < new Date(challenge.startDate).getTime()) return 'closed';
-  if (now < new Date(challenge.endDate).getTime()) return 'voting';
-  return 'completed';
+  
+  // Support both snake_case (Supabase) and camelCase (Mock/Legacy)
+  const regDeadline = challenge.registration_deadline || challenge.registrationDeadline;
+  const startDate = challenge.start_date || challenge.startDate;
+  const endDate = challenge.end_date || challenge.endDate;
+  const vEndDate = challenge.voting_end_date || challenge.votingEndDate;
+
+  const reg = regDeadline ? new Date(regDeadline).getTime() : 0;
+  const start = startDate ? new Date(startDate).getTime() : 0;
+  const end = endDate ? new Date(endDate).getTime() : 0;
+  const vEnd = vEndDate ? new Date(vEndDate).getTime() : 0;
+
+  if (vEnd && now > vEnd) return 'completed';
+  if (end && now > end) return 'voting';
+  if (start && now > start) return 'on_going';
+  if (reg && now > reg) return 'closed';
+  return 'entry_open';
 };
 
 export const getPhaseLabel = (phase: Challenge['phase']): string => {
   const labels: Record<Challenge['phase'], string> = {
     upcoming: 'Registration Opens Soon',
     entry_open: 'Registration Open',
+    on_going: 'Closed', // Label as Closed per user request
     closed: 'Closed',
     voting: 'Voting Phase',
     pending_verification: 'Pending Verification',

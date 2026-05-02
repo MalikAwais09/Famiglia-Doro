@@ -152,7 +152,7 @@ export function ChallengeDetail() {
       );
     }
 
-    if (isRegistrationOver || challenge?.phase === 'closed' || challenge?.phase === 'on_going') {
+    if (challenge?.phase === 'closed' || challenge?.phase === 'on_going' || isRegistrationOver) {
       if (challenge?.phase === 'voting') {
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
       }
@@ -217,7 +217,7 @@ export function ChallengeDetail() {
               <div className="flex items-center gap-2 mb-2">
                 <Badge>{challenge?.category}</Badge>
                 <Badge variant={challenge?.phase === 'entry_open' ? 'success' : challenge?.phase === 'on_going' ? 'warning' : challenge?.phase === 'upcoming' ? 'info' : 'default'}>
-                  {challenge?.phase === 'closed' ? 'Closed' : challenge?.phase?.replace('_', ' ')}
+                  {challenge?.phase === 'closed' || challenge?.phase === 'on_going' ? 'Closed' : challenge?.phase?.replace('_', ' ')}
                 </Badge>
                 <Badge>{challenge?.format}</Badge>
               </div>
