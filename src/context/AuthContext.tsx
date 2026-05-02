@@ -6,7 +6,6 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import {
@@ -15,6 +14,7 @@ import {
   signOut as authSignOut,
   signInWithGoogle as authSignInWithGoogle,
   signInWithApple as authSignInWithApple,
+  getOrCreateProfile,
 } from '@/lib/supabase/auth';
 
 // ── Profile type (mirrors our profiles table) ─────────────────────────────
@@ -73,7 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+
+  const ensureProfile = useCallback(async (u: User): Promise<UserProfile | null> => {
+    const name =
+      (u.user_metadata as any)?.name ||
+      (u.user_metadata as any)?.full_name ||
+      u.email?.split('@')[0] ||
+      'User';
+    const avatar =
+      (u.user_metadata as any)?.avatar_url ||
+      (u.user_metadata as any)?.picture ||
+      undefined;
+
+    const { profile: p } = await getOrCreateProfile(u.id, name, avatar);
+    return (p as UserProfile | null) ?? null;
+  }, []);
 
   // Load session on mount + subscribe to auth changes
   useEffect(() => {
@@ -85,9 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false); // Set loading false immediately after getting session
       
       if (sess?.user) {
-        fetchProfile(sess.user.id).then(p => {
-          setProfile(p);
-        });
+        ensureProfile(sess.user).then(setProfile);
       }
     }).catch(err => {
       console.error('Error getting session:', err);
@@ -100,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        fetchProfile(sess.user.id).then(setProfile);
+        ensureProfile(sess.user).then(setProfile);
       } else {
         setProfile(null);
       }
@@ -119,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
       clearTimeout(safety);
     };
-  }, [loading]);
+  }, [loading, ensureProfile]);
 
   // ── signIn ──────────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
@@ -127,11 +139,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (authUser) {
       setUser(authUser);
       setSession(authSession);
-      const p = await fetchProfile(authUser.id);
+      const p = await ensureProfile(authUser);
       setProfile(p);
     }
     return { error: error as Error | null };
-  }, []);
+  }, [ensureProfile]);
 
   // ── signUp ──────────────────────────────────────────────────────────────
   const signUp = useCallback(async (name: string, email: string, password: string) => {

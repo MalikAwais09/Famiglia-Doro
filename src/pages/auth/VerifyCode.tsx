@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { verifyOtp, resendOtp } from '@/lib/supabase/auth';
+import { getOrCreateProfile } from '@/lib/supabase/auth';
 
 export function VerifyCode() {
   const [codes, setCodes] = useState<string[]>(['', '', '', '', '', '']);
@@ -56,11 +57,23 @@ export function VerifyCode() {
     if (!email) { toast.error('Email not found. Please sign up again.'); return; }
     setLoading(true);
     const token = codes.join('');
-    const { error } = await verifyOtp(email, token);
+    const { error, user } = await verifyOtp(email, token);
     setLoading(false);
     if (error) {
       toast.error(error.message || 'Invalid or expired code. Please try again.');
       return;
+    }
+
+    if (user) {
+      const fallbackName =
+        user.user_metadata?.name ||
+        (sessionStorage.getItem('signup_name') || '') ||
+        email.split('@')[0];
+      const avatar =
+        (user.user_metadata as any)?.avatar_url ||
+        (user.user_metadata as any)?.picture ||
+        undefined;
+      await getOrCreateProfile(user.id, fallbackName || 'User', avatar);
     }
     sessionStorage.removeItem('signup_email');
     sessionStorage.removeItem('signup_name');
