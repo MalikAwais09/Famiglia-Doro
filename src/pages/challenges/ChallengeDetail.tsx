@@ -37,39 +37,57 @@ export function ChallengeDetail() {
   const { refreshBalance } = useWallet();
 
   useEffect(() => {
-    if (!id) return;
     let cancelled = false;
 
     async function load() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
-        const data = await getChallengeById(id!);
+        const data = await getChallengeById(id);
         if (!cancelled) setChallenge(data);
 
         // Check if current user has entered
-        const entry = await getMyEntry(id!);
+        const entry = await getMyEntry(id);
         if (!cancelled) {
           setMyEntry(entry);
           setHasEntered(!!entry);
         }
         // Fetch comments
-        const comms = await getComments(id!);
+        const comms = await getComments(id);
         if (!cancelled) setComments(comms);
 
         // Fetch participants
-        const parts = await getPublicParticipants(id!);
+        const parts = await getPublicParticipants(id);
         if (!cancelled) setParticipants(parts);
       } catch (err) {
         console.error('Error loading challenge:', err);
-        if (!cancelled) toast.error('Failed to load challenge details');
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Failed to load challenge details';
+          toast.error(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+
+  if (!id) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">Invalid challenge link (missing id).</p>
+        </Section>
+      </Container>
+    );
+  }
 
   if (loading) {
     return (
@@ -87,7 +105,9 @@ export function ChallengeDetail() {
     return (
       <Container>
         <Section>
-          <p className="text-center text-[#9CA3AF] py-8">Challenge not found</p>
+          <p className="text-center text-[#9CA3AF] py-8">
+            Challenge not found. ID: <span className="font-mono text-xs">{id}</span>
+          </p>
         </Section>
       </Container>
     );

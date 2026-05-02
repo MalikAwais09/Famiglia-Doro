@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import { Users } from 'lucide-react';
 import { getChallengeById } from '@/lib/supabase/challenges';
 import { enterChallenge, getMyEntry } from '@/lib/supabase/entries';
-import { supabase } from '@/lib/supabase/client';
 import type { Challenge } from '@/lib/supabase/types';
 
 export function ChallengeEnter() {
@@ -29,8 +28,14 @@ export function ChallengeEnter() {
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       setPageLoading(true);
+      if (!challengeId) {
+        setPageLoading(false);
+        return;
+      }
       try {
         const data = await getChallengeById(challengeId);
         if (!data) {
@@ -39,8 +44,12 @@ export function ChallengeEnter() {
           return;
         }
 
-        // Timing check
-        if (deadline && now > deadline) {
+        const now = Date.now();
+        const deadlineMs = data.registration_deadline
+          ? new Date(data.registration_deadline).getTime()
+          : null;
+
+        if (deadlineMs != null && now > deadlineMs) {
           toast.error('Registration for this challenge has closed');
           navigate(`/challenges/${challengeId}`);
           return;
@@ -53,24 +62,56 @@ export function ChallengeEnter() {
           return;
         }
 
-        setChallenge(data);
+        if (!cancelled) setChallenge(data);
 
         const entry = await getMyEntry(challengeId);
-        setHasEntered(!!entry);
+        if (!cancelled) setHasEntered(!!entry);
       } catch (err) {
         console.error('Error in ChallengeEnter load:', err);
-        toast.error('Failed to load challenge details');
+        const msg = err instanceof Error ? err.message : 'Failed to load challenge details';
+        toast.error(msg);
       } finally {
-        setPageLoading(false);
+        if (!cancelled) setPageLoading(false);
       }
     }
-    if (challengeId) {
-      load();
-    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId, navigate]);
 
-  if (pageLoading) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Loading...</p></Section></Container>;
-  if (!challenge) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Challenge not found</p></Section></Container>;
+  if (pageLoading) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">Loading challenge…</p>
+        </Section>
+      </Container>
+    );
+  }
+
+  if (!challengeId) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">Invalid challenge link (missing id).</p>
+        </Section>
+      </Container>
+    );
+  }
+
+  if (!challenge) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">
+            Challenge not found. ID: <span className="font-mono text-xs">{challengeId}</span>
+          </p>
+        </Section>
+      </Container>
+    );
+  }
 
   const isFree = challenge?.prize_type === 'bragging_rights' || challenge?.entry_fee === 0;
   const totalPool = challenge ? challenge.entry_fee * (challenge.current_participants || 0) : 0;

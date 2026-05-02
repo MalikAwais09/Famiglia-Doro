@@ -78,6 +78,7 @@ export async function getChallengeById(id: string): Promise<Challenge> {
       rules:challenge_rules(*)
     `)
     .eq('id', id)
+    .eq('is_deleted', false)
     .single();
 
   if (error) throw error;
