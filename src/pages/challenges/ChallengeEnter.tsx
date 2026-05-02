@@ -40,10 +40,15 @@ export function ChallengeEnter() {
         }
 
         // Timing check
-        const now = new Date();
-        const deadline = data.registration_deadline ? new Date(data.registration_deadline) : null;
         if (deadline && now > deadline) {
           toast.error('Registration for this challenge has closed');
+          navigate(`/challenges/${challengeId}`);
+          return;
+        }
+
+        const isFull = data.max_participants && data.current_participants >= data.max_participants;
+        if (isFull) {
+          toast.error('This challenge is full');
           navigate(`/challenges/${challengeId}`);
           return;
         }
@@ -60,7 +65,6 @@ export function ChallengeEnter() {
       }
     }
     if (challengeId) {
-      console.log('ChallengeEnter: loading data for', challengeId);
       load();
     }
   }, [challengeId, navigate]);
@@ -90,7 +94,6 @@ export function ChallengeEnter() {
     setLoading(true);
     try {
       const entry = await enterChallenge(challengeId);
-      console.log('Entry successful:', entry);
       toast.success('Successfully entered challenge!');
       
       navigate(`/challenges/${challengeId}/entry-success`, { 
@@ -171,26 +174,25 @@ export function ChallengeEnter() {
 
         <Button 
           fullWidth 
+          disabled={challenge.max_participants && challenge.current_participants >= challenge.max_participants}
           onClick={() => {
-            console.log('Main button clicked. isFree:', isFree);
             if (isFree) handleFreeEntry(); 
             else {
-              console.log('Opening terms modal');
               setTermsOpen(true);
             }
           }} 
           loading={loading}
         >
-          {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
+          {challenge.max_participants && challenge.current_participants >= challenge.max_participants 
+            ? 'Challenge Full' 
+            : (isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`)}
         </Button>
 
-        <AgreementModal open={termsOpen} onClose={() => { console.log('Terms closed'); setTermsOpen(false); }} title="Challenge Entry Agreement"
+        <AgreementModal open={termsOpen} onClose={() => { setTermsOpen(false); }} title="Challenge Entry Agreement"
           onAgree={() => { 
-            console.log('Terms agreed. isFree:', isFree);
             setTermsOpen(false); 
             if (isFree) handleFreeEntry(); 
             else {
-              console.log('Opening payment modal');
               setPaymentOpen(true);
             }
           }}>

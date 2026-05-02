@@ -12,9 +12,9 @@ import { AgreementModal } from '@/components/agreements/AgreementModal';
 import { Input } from '@/components/ui/Input';
 import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal';
 import { getChallengeById } from '@/lib/supabase/challenges';
-import { getMyEntry, withdrawEntry } from '@/lib/supabase/entries';
+import { getMyEntry, withdrawEntry, getPublicParticipants } from '@/lib/supabase/entries';
 import { getComments, postComment, type Comment } from '@/lib/supabase/comments';
-import type { Challenge } from '@/lib/supabase/types';
+import type { Challenge, Profile } from '@/lib/supabase/types';
 import { useWallet } from '@/context/WalletContext';
 
 export function ChallengeDetail() {
@@ -31,6 +31,7 @@ export function ChallengeDetail() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [participants, setParticipants] = useState<Pick<Profile, 'id' | 'name' | 'avatar_url' | 'role'>[]>([]);
 
   const { refreshBalance } = useWallet();
 
@@ -53,6 +54,10 @@ export function ChallengeDetail() {
         // Fetch comments
         const comms = await getComments(id!);
         if (!cancelled) setComments(comms);
+
+        // Fetch participants
+        const parts = await getPublicParticipants(id!);
+        if (!cancelled) setParticipants(parts);
       } catch (err) {
         console.error('Error loading challenge:', err);
         if (!cancelled) toast.error('Failed to load challenge details');
@@ -152,14 +157,16 @@ export function ChallengeDetail() {
       );
     }
 
-    if (challenge?.phase === 'closed' || challenge?.phase === 'on_going' || isRegistrationOver) {
+    const isFull = challenge?.max_participants && challenge.current_participants >= challenge.max_participants;
+
+    if (challenge?.phase === 'closed' || challenge?.phase === 'on_going' || isRegistrationOver || isFull) {
       if (challenge?.phase === 'voting') {
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
       }
       if (challenge?.phase === 'completed') {
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
       }
-      return <Button disabled fullWidth>Registration Closed</Button>;
+      return <Button disabled fullWidth>{isFull ? 'Challenge Full' : 'Registration Closed'}</Button>;
     }
 
     switch (challenge?.phase) {
@@ -345,6 +352,29 @@ export function ChallengeDetail() {
                 {/* We rely on getActionButtons above for the actual submit button to handle the 'isEnded' check */}
               </Card>
             )}
+
+            <Card>
+              <h3 className="text-sm font-semibold mb-3 flex items-center justify-between">
+                Participants 
+                <span className="text-xs font-normal text-[#9CA3AF]">{challenge.current_participants}{challenge.max_participants ? `/${challenge.max_participants}` : ''}</span>
+              </h3>
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                {participants.length === 0 ? (
+                  <p className="text-xs text-[#6B7280] italic">No one has joined yet.</p>
+                ) : (
+                  participants.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <img src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`} className="w-6 h-6 rounded-full bg-[#27272a]" alt="" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{p.name || 'Anonymous'}</p>
+                        <p className="text-[10px] text-[#6B7280] capitalize">{p.role.replace('_', ' ')}</p>
+                      </div>
+                      {p.id === challenge.created_by && <Badge variant="default" className="text-[8px] px-1 py-0 h-auto">Host</Badge>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
 
             {challenge?.sponsorship_enabled && (
               <Card>

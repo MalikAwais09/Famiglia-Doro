@@ -25,7 +25,7 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
 
   if (challenge.phase !== 'entry_open') throw new Error('Challenge is not open for entries');
   if (challenge.max_participants && challenge.current_participants >= challenge.max_participants) {
-    throw new Error('Challenge is full');
+    throw new Error(`This challenge is full (${challenge.max_participants}/${challenge.max_participants} participants)`);
   }
 
   // Check if already entered
@@ -225,4 +225,17 @@ export async function getChallengeEntries(challengeId: string): Promise<(Entry &
 
   if (error) throw error;
   return data as (Entry & { user: Profile })[];
+}
+
+// ── getPublicParticipants ────────────────────────────────────────────────
+export async function getPublicParticipants(challengeId: string): Promise<Pick<Profile, 'id' | 'name' | 'avatar_url' | 'role'>[]> {
+  const { data, error } = await supabase
+    .from('entries')
+    .select(`
+      user:profiles (id, name, avatar_url, role)
+    `)
+    .eq('challenge_id', challengeId);
+
+  if (error) throw error;
+  return (data || []).map((d: any) => d.user);
 }
