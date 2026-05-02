@@ -7,6 +7,7 @@ import { useNotifications } from '@/context/NotificationContext';
 import { WalletDropdown } from '@/components/wallet/WalletDropdown';
 import { Badge } from '@/components/ui/Badge';
 import { formatRelativeTime } from '@/lib/utils/dateUtils';
+import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -111,6 +112,15 @@ function ProfileDropdown({ onClose }: { onClose: () => void }) {
       <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
         <p className="text-sm font-medium truncate">{userName || 'User'}</p>
       </div>
+      {profile?.role === 'admin' && (
+        <Link
+          to="/admin"
+          onClick={() => onClose()}
+          className="block w-full text-left px-4 py-2 text-sm text-[#9CA3AF] hover:text-white hover:bg-[#222225] transition-colors"
+        >
+          Admin Panel
+        </Link>
+      )}
       <button onClick={() => navigate('/settings')} className="w-full text-left px-4 py-2 text-sm text-[#9CA3AF] hover:text-white hover:bg-[#222225] transition-colors">Settings</button>
       <button onClick={() => { onClose(); signOut(); }} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-[#222225] transition-colors">Sign Out</button>
     </div>

@@ -43,6 +43,13 @@ const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.S
 const TermsOfService = lazy(() => import('@/pages/legal/TermsOfService').then(m => ({ default: m.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/pages/legal/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 const CommunityGuidelines = lazy(() => import('@/pages/legal/CommunityGuidelines').then(m => ({ default: m.CommunityGuidelines })));
+const AdminLayout = lazy(() => import('@/pages/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers').then(m => ({ default: m.AdminUsers })));
+const AdminChallenges = lazy(() => import('@/pages/admin/AdminChallenges').then(m => ({ default: m.AdminChallenges })));
+const AdminTransactions = lazy(() => import('@/pages/admin/AdminTransactions').then(m => ({ default: m.AdminTransactions })));
+const AdminAgreements = lazy(() => import('@/pages/admin/AdminAgreements').then(m => ({ default: m.AdminAgreements })));
+const AdminFraud = lazy(() => import('@/pages/admin/AdminFraud').then(m => ({ default: m.AdminFraud })));
 
 function SuspenseFallback() {
   return (
@@ -96,6 +103,14 @@ export default function App() {
                       <Route path="/winners/:challengeId" element={<ProtectedRoute><WinnerSpotlight /></ProtectedRoute>} />
                     <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
                     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+                      <Route index element={<AdminDashboard />} />
+                      <Route path="users" element={<AdminUsers />} />
+                      <Route path="challenges" element={<AdminChallenges />} />
+                      <Route path="transactions" element={<AdminTransactions />} />
+                      <Route path="agreements" element={<AdminAgreements />} />
+                      <Route path="fraud" element={<AdminFraud />} />
+                    </Route>
                     </Route>
                   </Routes>
                 </Suspense>

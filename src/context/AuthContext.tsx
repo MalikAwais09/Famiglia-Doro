@@ -16,12 +16,13 @@ import {
   signInWithApple as authSignInWithApple,
   getOrCreateProfile,
 } from '@/lib/supabase/auth';
+import { toast } from 'sonner';
 
 // ── Profile type (mirrors our profiles table) ─────────────────────────────
 export interface UserProfile {
   id: string;
   name: string | null;
-  role: 'free' | 'creatorPro' | 'eliteHost';
+  role: 'free' | 'creatorPro' | 'eliteHost' | 'admin';
   points: number;
   wins: number;
   challenges_count: number;
@@ -86,7 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       undefined;
 
     const { profile: p } = await getOrCreateProfile(u.id, name, avatar);
-    return (p as UserProfile | null) ?? null;
+    const prof = (p as UserProfile | null) ?? null;
+    if (prof?.is_banned) {
+      await supabase.auth.signOut();
+      toast.error('Your account has been suspended. Contact support.');
+      setUser(null);
+      setProfile(null);
+      return null;
+    }
+    return prof;
   }, []);
 
   // Load session on mount + subscribe to auth changes

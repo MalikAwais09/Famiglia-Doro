@@ -2,7 +2,7 @@
 // Supabase Database Types — mirrors schema.sql exactly
 // ============================================================
 
-export type UserRole = 'free' | 'creatorPro' | 'eliteHost';
+export type UserRole = 'free' | 'creatorPro' | 'eliteHost' | 'admin';
 export type ChallengeFormat = '1v1' | 'group' | 'tournament';
 export type ChallengePhase =
   | 'upcoming'
