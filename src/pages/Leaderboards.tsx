@@ -39,8 +39,8 @@ export function Leaderboards() {
     setLoading(true);
     try {
       const [rows, ur] = await Promise.all([
-        getLeaderboard('points', period),
-        profile?.id ? getCurrentUserRank('points', period) : Promise.resolve(null),
+        getLeaderboard('challenges_count', period),
+        profile?.id ? getCurrentUserRank('challenges_count', period) : Promise.resolve(null),
       ]);
       setData(rows);
       setUserRank(ur);
@@ -64,7 +64,7 @@ export function Leaderboards() {
   return (
     <Container>
       <Section>
-        <PageHeader title="Leaderboards" subtitle="Top competitors ranked by points" />
+        <PageHeader title="Leaderboards" subtitle="Top competitors ranked by challenges, wins, and points" />
         <div className="flex gap-2 mb-6">
           {TABS.map(t => (
             <button

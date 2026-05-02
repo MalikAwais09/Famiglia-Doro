@@ -12,7 +12,7 @@ export interface LeaderboardRow {
   challenges_count: number;
 }
 
-export type LeaderboardType = 'points' | 'wins';
+export type LeaderboardType = 'points' | 'wins' | 'challenges_count';
 export type LeaderboardPeriod = 'all' | 'weekly' | 'monthly';
 
 function periodCutoffIso(period: LeaderboardPeriod): string | null {
@@ -38,8 +38,11 @@ export async function getLeaderboard(
     q = q.gte('updated_at', cutoff);
   }
 
-  const orderCol = type === 'wins' ? 'wins' : 'points';
-  q = q.order(orderCol, { ascending: false }).limit(50);
+  // Compound sort per user request: challenges_count -> wins -> points
+  q = q.order('challenges_count', { ascending: false })
+       .order('wins', { ascending: false })
+       .order('points', { ascending: false })
+       .limit(50);
 
   const { data, error } = await q;
 
@@ -70,19 +73,26 @@ export async function getCurrentUserRank(
 
   const { data: me, error: meErr } = await supabase
     .from('profiles')
-    .select('points, wins')
+    .select('points, wins, challenges_count')
     .eq('id', session.user.id)
     .single();
 
   if (meErr || !me) return null;
 
-  const myScore = type === 'wins' ? me.wins : me.points;
   const cutoff = periodCutoffIso(period);
 
-  let countQuery =
-    type === 'wins'
-      ? supabase.from('profiles').select('id', { count: 'exact', head: true }).gt('wins', myScore)
-      : supabase.from('profiles').select('id', { count: 'exact', head: true }).gt('points', myScore);
+  // For rank calculation, we need to match the compound sort logic
+  // This is tricky with simple .gt() filters for compound sorts.
+  // We'll simplify to primary sort by challenges_count if type is not specified or matching the new logic.
+  let countQuery = supabase.from('profiles').select('id', { count: 'exact', head: true });
+  
+  if (type === 'challenges_count') {
+    countQuery = countQuery.gt('challenges_count', me.challenges_count);
+  } else if (type === 'wins') {
+    countQuery = countQuery.gt('wins', me.wins);
+  } else {
+    countQuery = countQuery.gt('points', me.points);
+  }
 
   if (cutoff) {
     countQuery = countQuery.gte('updated_at', cutoff);
