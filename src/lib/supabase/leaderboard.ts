@@ -10,6 +10,7 @@ export interface LeaderboardRow {
   points: number;
   wins: number;
   challenges_count: number;
+  win_rate: number;
 }
 
 export type LeaderboardType = 'points' | 'wins' | 'challenges_count';
@@ -38,10 +39,9 @@ export async function getLeaderboard(
     q = q.gte('updated_at', cutoff);
   }
 
-  // Compound sort per user request: challenges_count -> wins -> points
-  q = q.order('challenges_count', { ascending: false })
+  // Compound sort per user request: points -> wins
+  q = q.order('points', { ascending: false })
        .order('wins', { ascending: false })
-       .order('points', { ascending: false })
        .limit(50);
 
   const { data, error } = await q;
@@ -58,6 +58,7 @@ export async function getLeaderboard(
     points: p.points,
     wins: p.wins,
     challenges_count: p.challenges_count,
+    win_rate: p.challenges_count > 0 ? (p.wins / p.challenges_count) * 100 : 0,
   }));
 }
 
@@ -86,12 +87,12 @@ export async function getCurrentUserRank(
   // We'll simplify to primary sort by challenges_count if type is not specified or matching the new logic.
   let countQuery = supabase.from('profiles').select('id', { count: 'exact', head: true });
   
-  if (type === 'challenges_count') {
-    countQuery = countQuery.gt('challenges_count', me.challenges_count);
+  if (type === 'points') {
+    countQuery = countQuery.gt('points', me.points);
   } else if (type === 'wins') {
     countQuery = countQuery.gt('wins', me.wins);
   } else {
-    countQuery = countQuery.gt('points', me.points);
+    countQuery = countQuery.gt('challenges_count', me.challenges_count);
   }
 
   if (cutoff) {
