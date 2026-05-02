@@ -88,6 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { profile: p } = await getOrCreateProfile(u.id, name, avatar);
     const prof = (p as UserProfile | null) ?? null;
+    if (import.meta.env.DEV) {
+      console.log('=== AUTH DEBUG ===');
+      console.log('User:', u?.email);
+      console.log('Profile:', prof);
+      console.log('Role:', prof?.role);
+      console.log('Is admin:', prof?.role === 'admin');
+    }
     if (prof?.is_banned) {
       await supabase.auth.signOut();
       toast.error('Your account has been suspended. Contact support.');

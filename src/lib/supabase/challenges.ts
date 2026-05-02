@@ -9,7 +9,14 @@ export async function getEntryCountForChallenge(challengeId: string): Promise<nu
     .select('id', { count: 'exact', head: true })
     .eq('challenge_id', challengeId);
 
-  if (error) throw error;
+  if (error) {
+    if (import.meta.env.DEV) {
+      console.log('getEntryCountForChallenge blocked/fallback:', { challengeId, error });
+    }
+    // RLS can block aggregate reads on entries for non-creators.
+    // Caller should fallback to denormalized `current_participants`.
+    throw error;
+  }
   return count ?? 0;
 }
 
@@ -69,10 +76,19 @@ export function computePhase(challenge: any, at?: Date): ChallengePhase {
   return 'entry_open';
 }
 
+function safeComputePhase(challenge: any, at?: Date): ChallengePhase {
+  try {
+    return computePhase(challenge, at);
+  } catch (err) {
+    console.error('computePhase error:', err, challenge);
+    return (challenge?.phase as ChallengePhase) ?? 'upcoming';
+  }
+}
+
 /** One-line countdown / status for list cards and detail timeline */
 export function getChallengeListCountdownLine(challenge: Challenge | Record<string, unknown>, at?: Date): string {
   const ch = challenge as Challenge;
-  const phase = computePhase(ch, at);
+  const phase = safeComputePhase(ch, at);
   const reg = ch.registration_deadline;
   const start = ch.start_date;
   const end = ch.end_date;
@@ -139,6 +155,10 @@ export function getPhaseBadgeVariant(
 
 // ── getChallenges ────────────────────────────────────────────────────────
 export async function getChallenges(filters?: ChallengeFilters): Promise<Challenge[]> {
+  if (import.meta.env.DEV) {
+    console.log('=== CHALLENGES DEBUG ===');
+    console.log('Fetching challenges...', filters);
+  }
   let query = supabase
     .from('challenges')
     .select(`
@@ -157,13 +177,21 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
 
   const { data, error } = await query.order('created_at', { ascending: false });
 
+  if (import.meta.env.DEV) {
+    console.log('Challenges result:', data);
+    console.log('Challenges error:', error);
+  }
   if (error) throw error;
 
   const rows = data || [];
   const counts = await Promise.all(
     rows.map(async (ch) => {
-      const n = await getEntryCountForChallenge(ch.id);
-      return [ch.id, n] as const;
+      try {
+        const n = await getEntryCountForChallenge(ch.id);
+        return [ch.id, n] as const;
+      } catch {
+        return [ch.id, Number(ch.current_participants ?? 0)] as const;
+      }
     })
   );
   const countById = Object.fromEntries(counts) as Record<string, number>;
@@ -173,7 +201,7 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
     return {
       ...ch,
       current_participants,
-      phase: computePhase({ ...ch, current_participants }),
+      phase: safeComputePhase({ ...ch, current_participants }),
     };
   }) as Challenge[];
 
@@ -200,12 +228,17 @@ export async function getChallengeById(id: string): Promise<Challenge> {
   if (error) throw error;
   if (!data) throw new Error('Challenge not found');
 
-  const current_participants = await getEntryCountForChallenge(id);
+  let current_participants = Number((data as any)?.current_participants ?? 0);
+  try {
+    current_participants = await getEntryCountForChallenge(id);
+  } catch {
+    // fallback to existing denormalized value
+  }
 
   return {
     ...data,
     current_participants,
-    phase: computePhase({ ...data, current_participants }),
+    phase: safeComputePhase({ ...data, current_participants }),
     rules: data.rules || [],
   } as Challenge;
 }
