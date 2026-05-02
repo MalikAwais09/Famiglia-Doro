@@ -20,20 +20,13 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { profile, loading: authLoading, refreshProfile, user } = useAuth();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const packages = getDoroCoinPackages();
 
   // Balance comes directly from AuthContext profile to avoid stuck spinners / extra queries.
-  const balance = profile?.dorocoin_balance ?? 0;
+  const balance = Number(profile?.dorocoin_balance ?? 0);
   const loading = authLoading;
-
-  if (import.meta.env.DEV) {
-    console.log('=== WALLET DEBUG ===');
-    console.log('User:', user?.id);
-    console.log('Loading:', loading);
-    console.log('Balance:', balance);
-  }
 
   const refreshTransactions = useCallback(async () => {
     if (!user) {
@@ -104,7 +97,3 @@ export function useWallet() {
   if (!ctx) throw new Error('useWallet must be used within WalletProvider');
   return ctx;
 }
-
-
-
-// sdhfks

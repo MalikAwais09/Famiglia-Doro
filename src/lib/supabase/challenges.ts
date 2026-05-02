@@ -303,7 +303,20 @@ export async function createChallenge(payload: CreateChallengePayload): Promise<
     if (rulesError) throw rulesError;
   }
 
-  return getChallengeById(challenge.id);
+  const { data: rulesOut } = await supabase
+    .from('challenge_rules')
+    .select('*')
+    .eq('challenge_id', challenge.id)
+    .order('order_index', { ascending: true });
+
+  const current_participants = Number((challenge as { current_participants?: number }).current_participants ?? 0);
+
+  return {
+    ...challenge,
+    rules: rulesOut ?? [],
+    current_participants,
+    phase: safeComputePhase({ ...challenge, current_participants }),
+  } as Challenge;
 }
 
 // ── uploadCoverImage ──────────────────────────────────────────────────────

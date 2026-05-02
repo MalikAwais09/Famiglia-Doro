@@ -61,6 +61,10 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
       console.warn('Profile fetch error (might not exist yet):', error.message);
       return null;
     }
+    if ((import.meta as any)?.env?.DEV && data) {
+      console.log('Profile fetched:', data);
+      console.log('DoroCoins:', (data as UserProfile).dorocoin_balance);
+    }
     return data as UserProfile;
   } catch (err) {
     console.error('Unexpected error in fetchProfile:', err);
@@ -87,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       undefined;
 
     const { profile: p } = await getOrCreateProfile(u.id, name, avatar);
-    const prof = (p as UserProfile | null) ?? null;
+    let prof = (p as UserProfile | null) ?? null;
     if (prof?.is_banned) {
       await supabase.auth.signOut();
       toast.error('Your account has been suspended. Contact support.');
@@ -95,6 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       return null;
     }
+    // Full row refresh so fields like dorocoin_balance always match DB (handles partial payloads / edge paths).
+    const fresh = await fetchProfile(u.id);
+    prof = fresh ?? prof;
     return prof;
   }, []);
 
@@ -147,12 +154,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [ensureProfile]);
 
-  // Realtime profile updates (balance, role, ban flag, etc.)
+  // Realtime profile updates — merge payloads so partial rows never wipe dorocoin_balance etc.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user) return;
 
     const channel = supabase
-      .channel('profile_updates')
+      .channel(`profile_${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -162,10 +169,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          if ((import.meta as any)?.env?.DEV) {
-            console.log('Profile updated:', payload.new);
-          }
-          setProfile(payload.new as UserProfile);
+          console.log('Profile realtime update:', payload.new);
+          setProfile((prev) => {
+            const next = payload.new as Partial<UserProfile>;
+            if (!prev) return next as UserProfile;
+            return { ...prev, ...next };
+          });
         },
       )
       .subscribe();
@@ -173,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user]);
 
   // ── signIn ──────────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
@@ -230,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (user) {
       const p = await fetchProfile(user.id);
-      setProfile(p);
+      if (p) setProfile(p);
     }
   }, [user]);
 

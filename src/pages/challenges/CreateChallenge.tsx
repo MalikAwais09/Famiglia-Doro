@@ -114,10 +114,14 @@ export function CreateChallenge() {
       // Upload cover image if user selected one
       if (promoImageFileRef.current) {
         try {
-          await uploadCoverImage(created.id, promoImageFileRef.current);
+          await Promise.race([
+            uploadCoverImage(created.id, promoImageFileRef.current),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Cover upload timed out')), 45000),
+            ),
+          ]);
         } catch {
-          // Non-fatal — challenge is created, image just won't show
-          toast.warning('Challenge created but cover image upload failed');
+          toast.warning('Challenge created but cover image upload failed or timed out');
         }
       }
 
