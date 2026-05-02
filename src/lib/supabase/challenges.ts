@@ -10,9 +10,6 @@ export async function getEntryCountForChallenge(challengeId: string): Promise<nu
     .eq('challenge_id', challengeId);
 
   if (error) {
-    if (import.meta.env.DEV) {
-      console.log('getEntryCountForChallenge blocked/fallback:', { challengeId, error });
-    }
     // RLS can block aggregate reads on entries for non-creators.
     // Caller should fallback to denormalized `current_participants`.
     throw error;
@@ -153,19 +150,38 @@ export function getPhaseBadgeVariant(
   }
 }
 
+/** Fetches creators in a separate query so profile RLS cannot fail the challenges request. */
+export async function mergeChallengeCreators<T extends { created_by?: string | null }>(
+  rows: T[]
+): Promise<(T & { creator?: Challenge['creator'] })[]> {
+  const creatorIds = [
+    ...new Set(rows.map((r) => r.created_by).filter((id): id is string => Boolean(id))),
+  ];
+  let creatorById: Record<string, NonNullable<Challenge['creator']>> = {};
+  if (creatorIds.length > 0) {
+    const { data: creators, error } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url, role')
+      .in('id', creatorIds);
+    if (!error && creators?.length) {
+      creatorById = Object.fromEntries(
+        creators.map((c) => [c.id, c as NonNullable<Challenge['creator']>])
+      );
+    }
+  }
+
+  return rows.map((ch) => ({
+    ...ch,
+    creator: ch.created_by ? creatorById[ch.created_by] : undefined,
+  }));
+}
+
 // ── getChallenges ────────────────────────────────────────────────────────
 export async function getChallenges(filters?: ChallengeFilters): Promise<Challenge[]> {
-  if (import.meta.env.DEV) {
-    console.log('=== CHALLENGES DEBUG ===');
-    console.log('Fetching challenges...', filters);
-  }
-  let query = supabase
-    .from('challenges')
-    .select(`
-      *,
-      creator:profiles!challenges_created_by_fkey(id, name, avatar_url, role)
-    `)
-    .eq('is_deleted', false);
+  /** Avoid resource-embedding `profiles` in the same PostgREST call: restrictive profile RLS
+   * (e.g. “own row only”) can fail the entire request instead of omitting nested rows.
+   */
+  let query = supabase.from('challenges').select('*').eq('is_deleted', false);
 
   if (filters?.category && filters.category !== 'All') {
     query = query.eq('category', filters.category);
@@ -176,28 +192,16 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
   }
 
   const { data, error } = await query.order('created_at', { ascending: false });
-
-  if (import.meta.env.DEV) {
-    console.log('Challenges result:', data);
-    console.log('Challenges error:', error);
-  }
   if (error) throw error;
 
   const rows = data || [];
-  const counts = await Promise.all(
-    rows.map(async (ch) => {
-      try {
-        const n = await getEntryCountForChallenge(ch.id);
-        return [ch.id, n] as const;
-      } catch {
-        return [ch.id, Number(ch.current_participants ?? 0)] as const;
-      }
-    })
-  );
-  const countById = Object.fromEntries(counts) as Record<string, number>;
+  const withCreators = await mergeChallengeCreators(rows);
 
-  let challenges = rows.map((ch) => {
-    const current_participants = countById[ch.id] ?? 0;
+  /** Use stored `current_participants` on list views — counting `entries` is often RLS-bound
+   * and N× queries are fragile on slower networks.
+   */
+  let challenges = withCreators.map((ch) => {
+    const current_participants = Number(ch.current_participants ?? 0);
     return {
       ...ch,
       current_participants,
@@ -206,7 +210,7 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
   }) as Challenge[];
 
   if (filters?.phase) {
-    challenges = challenges.filter(c => c.phase === filters.phase);
+    challenges = challenges.filter((c) => c.phase === filters.phase);
   }
 
   return challenges;
@@ -216,17 +220,23 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
 export async function getChallengeById(id: string): Promise<Challenge> {
   const { data, error } = await supabase
     .from('challenges')
-    .select(`
-      *,
-      creator:profiles!challenges_created_by_fkey(id, name, avatar_url, role),
-      rules:challenge_rules(*)
-    `)
+    .select(`*, rules:challenge_rules(*)`)
     .eq('id', id)
     .eq('is_deleted', false)
     .single();
 
   if (error) throw error;
   if (!data) throw new Error('Challenge not found');
+
+  let creator: Challenge['creator'];
+  if (data.created_by) {
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url, role')
+      .eq('id', data.created_by)
+      .maybeSingle();
+    creator = (p as Challenge['creator']) ?? undefined;
+  }
 
   let current_participants = Number((data as any)?.current_participants ?? 0);
   try {
@@ -237,6 +247,7 @@ export async function getChallengeById(id: string): Promise<Challenge> {
 
   return {
     ...data,
+    creator,
     current_participants,
     phase: safeComputePhase({ ...data, current_participants }),
     rules: data.rules || [],

@@ -15,10 +15,6 @@ interface HeaderProps {
 
 export function Header({ onMenuToggle }: HeaderProps) {
   const { profile } = useAuth();
-  if (import.meta.env.DEV) {
-    console.log('=== HEADER DEBUG ===');
-    console.log('Profile in header:', profile?.role);
-  }
   const userName = profile?.name;
   const { role, isCreator, isElite } = useRole();
   const { balance } = useWallet();

@@ -1,4 +1,5 @@
 import { supabase } from './client';
+import { mergeChallengeCreators } from './challenges';
 import type { AgreementType, ChallengePhase, Profile, TransactionType } from './types';
 
 export type AdminUserRole = Profile['role'] | 'admin';
@@ -125,13 +126,7 @@ export async function getAllChallenges(
 
   let q = supabase
     .from('challenges')
-    .select(
-      `
-      *,
-      creator:profiles!challenges_created_by_fkey(id, name, avatar_url, role)
-    `,
-      { count: 'exact' }
-    )
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -140,7 +135,9 @@ export async function getAllChallenges(
 
   const { data, count, error } = await q;
   if (error) throw error;
-  return { challenges: data ?? [], total: count ?? 0 };
+  const rows = data ?? [];
+  const challenges = await mergeChallengeCreators(rows);
+  return { challenges, total: count ?? 0 };
 }
 
 export async function overridePhase(challengeId: string, phase: ChallengePhase) {

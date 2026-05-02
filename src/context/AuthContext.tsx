@@ -88,13 +88,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { profile: p } = await getOrCreateProfile(u.id, name, avatar);
     const prof = (p as UserProfile | null) ?? null;
-    if (import.meta.env.DEV) {
-      console.log('=== AUTH DEBUG ===');
-      console.log('User:', u?.email);
-      console.log('Profile:', prof);
-      console.log('Role:', prof?.role);
-      console.log('Is admin:', prof?.role === 'admin');
-    }
     if (prof?.is_banned) {
       await supabase.auth.signOut();
       toast.error('Your account has been suspended. Contact support.');
@@ -105,49 +98,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return prof;
   }, []);
 
-  // Load session on mount + subscribe to auth changes
+  // Load session on mount + subscribe to auth changes (do not depend on `loading` — avoids duplicate listeners)
   useEffect(() => {
-    // Check existing session
-    supabase.auth.getSession().then(({ data }) => {
-      const sess = data.session;
-      setSession(sess);
-      setUser(sess?.user ?? null);
-      setLoading(false); // Set loading false immediately after getting session
-      
-      if (sess?.user) {
-        ensureProfile(sess.user).then(setProfile);
-      }
-    }).catch(err => {
-      console.error('Error getting session:', err);
-      setLoading(false);
-    });
+    let cancelled = false;
 
-    // Subscribe to future auth events
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, sess) => {
-      console.log('Auth state change:', event, sess?.user?.id);
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const sess = data.session;
+        setSession(sess);
+        setUser(sess?.user ?? null);
+        setLoading(false);
+        if (sess?.user) {
+          ensureProfile(sess.user).then((prof) => {
+            if (!cancelled) setProfile(prof);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Error getting session:', err);
+        if (!cancelled) setLoading(false);
+      });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        ensureProfile(sess.user).then(setProfile);
+        const prof = await ensureProfile(sess.user);
+        setProfile(prof);
       } else {
         setProfile(null);
       }
       setLoading(false);
     });
 
-    // Safety timeout: Never stay loading more than 2.5 seconds
     const safety = setTimeout(() => {
-      if (loading) {
-        console.warn('Auth loading safety timeout hit - forcing load');
-        setLoading(false);
-      }
+      setLoading((prev) => {
+        if (prev) console.warn('Auth loading safety timeout hit - forcing load');
+        return false;
+      });
     }, 2500);
 
     return () => {
+      cancelled = true;
       listener.subscription.unsubscribe();
       clearTimeout(safety);
     };
-  }, [loading, ensureProfile]);
+  }, [ensureProfile]);
 
   // ── signIn ──────────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
