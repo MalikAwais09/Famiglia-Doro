@@ -44,8 +44,8 @@ export function effectiveVotingEndMs(challenge: { end_date?: string | null; voti
 }
 
 // ── computePhase ──────────────────────────────────────────────────────────
-export function computePhase(challenge: any): ChallengePhase {
-  const now = Date.now();
+export function computePhase(challenge: any, at?: Date): ChallengePhase {
+  const now = (at ?? new Date()).getTime();
 
   const reg = parseMs(challenge.registration_deadline);
   const start = parseMs(challenge.start_date);
@@ -70,9 +70,9 @@ export function computePhase(challenge: any): ChallengePhase {
 }
 
 /** One-line countdown / status for list cards and detail timeline */
-export function getChallengeListCountdownLine(challenge: Challenge | Record<string, unknown>): string {
+export function getChallengeListCountdownLine(challenge: Challenge | Record<string, unknown>, at?: Date): string {
   const ch = challenge as Challenge;
-  const phase = computePhase(ch);
+  const phase = computePhase(ch, at);
   const reg = ch.registration_deadline;
   const start = ch.start_date;
   const end = ch.end_date;

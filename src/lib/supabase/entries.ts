@@ -159,6 +159,7 @@ export async function getMyEntries(): Promise<MyEntryListItem[]> {
         category,
         cover_image_url,
         phase,
+        registration_deadline,
         start_date,
         end_date,
         voting_end_date,

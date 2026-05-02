@@ -26,6 +26,9 @@ import { useAuth } from '@/context/AuthContext';
 import { getComments, postComment, type Comment } from '@/lib/supabase/comments';
 import type { Challenge, Profile } from '@/lib/supabase/types';
 import { useWallet } from '@/context/WalletContext';
+import { useLivePhase } from '@/hooks/useLivePhase';
+import { useNow } from '@/hooks/useNow';
+import { ChallengeCountdown } from '@/components/ChallengeCountdown';
 
 export function ChallengeDetail() {
   const { id } = useParams();
@@ -47,6 +50,9 @@ export function ChallengeDetail() {
   const { refreshBalance } = useWallet();
   const { profile, user } = useAuth();
   const isAuthenticated = !!user;
+
+  const phase = useLivePhase(challenge, 1000);
+  const tickNow = useNow(1000);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,79 +99,12 @@ export function ChallengeDetail() {
     };
   }, [id]);
 
-  if (!id) {
-    return (
-      <Container>
-        <Section>
-          <p className="text-center text-[#9CA3AF] py-8">Invalid challenge link (missing id).</p>
-        </Section>
-      </Container>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Container>
-        <Section>
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-yellow-500" size={32} />
-          </div>
-        </Section>
-      </Container>
-    );
-  }
-
-  if (!challenge) {
-    return (
-      <Container>
-        <Section>
-          <p className="text-center text-[#9CA3AF] py-8">
-            Challenge not found. ID: <span className="font-mono text-xs">{id}</span>
-          </p>
-        </Section>
-      </Container>
-    );
-  }
-
-  const isFree = challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0;
-  const totalPool = challenge.entry_fee * challenge.current_participants;
-  const isCreator = !!profile?.id && profile.id === challenge.created_by;
-  const phase = challenge.phase;
-  const votingEndDisplay =
-    challenge.voting_end_date ||
-    (challenge.end_date ? votingEndFromEndDate(challenge.end_date) : undefined);
-  const resultsDateDisplay =
-    challenge.results_date ||
-    (challenge.end_date ? resultsDateFromEndDate(challenge.end_date) : undefined);
-
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success('Link copied');
-  };
-
-  const handleWithdraw = async () => {
-    if (!myEntry || !id) return;
-    if (!confirm('Are you sure you want to withdraw your entry?')) return;
-    setWithdrawLoading(true);
-    try {
-      const res = await withdrawEntry(id, myEntry.id);
-      setHasEntered(false);
-      setMyEntry(null);
-      if (res.refunded > 0) {
-        await refreshBalance();
-        toast.success(`Entry withdrawn. ${res.refunded} DC refunded.`);
-      } else {
-        toast.success('Entry withdrawn.');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to withdraw entry');
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
-
   const getActionButtons = () => {
-    const now = Date.now();
+    if (!challenge || !id) return null;
+
+    const isCreatorLocal = !!profile?.id && profile.id === challenge.created_by;
+    const isFreeLocal = challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0;
+    const now = tickNow.getTime();
     const isStarted = challenge?.start_date && new Date(challenge.start_date).getTime() <= now;
     const isEnded = challenge?.end_date && new Date(challenge.end_date).getTime() <= now;
     const startMs = challenge?.start_date ? new Date(challenge.start_date).getTime() : null;
@@ -174,13 +113,13 @@ export function ChallengeDetail() {
     const afterEnd = endMs !== null && now > endMs;
 
     const showEnterButton =
-      !isCreator &&
+      !isCreatorLocal &&
       isAuthenticated &&
       (phase === 'upcoming' || phase === 'entry_open') &&
       !hasEntered;
 
     const showSubmitButton =
-      !isCreator &&
+      !isCreatorLocal &&
       hasEntered &&
       phase === 'active' &&
       !hasSubmitted &&
@@ -265,12 +204,12 @@ export function ChallengeDetail() {
             navigate(`/challenges/${id}/enter`);
           }}
         >
-          {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
+          {isFreeLocal ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
         </Button>
       );
     }
 
-    if (isCreator && (phase === 'upcoming' || phase === 'entry_open')) {
+    if (isCreatorLocal && (phase === 'upcoming' || phase === 'entry_open')) {
       return (
         <div className="w-full flex justify-center">
           <Badge>You created this challenge</Badge>
@@ -280,6 +219,50 @@ export function ChallengeDetail() {
 
     return null;
   };
+
+  if (!id) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">Invalid challenge link (missing id).</p>
+        </Section>
+      </Container>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Container>
+        <Section>
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="animate-spin text-yellow-500" size={32} />
+          </div>
+        </Section>
+      </Container>
+    );
+  }
+
+  if (!challenge) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">
+            Challenge not found. ID: <span className="font-mono text-xs">{id}</span>
+          </p>
+        </Section>
+      </Container>
+    );
+  }
+
+  const isFree = challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0;
+  const totalPool = challenge.entry_fee * challenge.current_participants;
+  const isCreator = !!profile?.id && profile.id === challenge.created_by;
+  const votingEndDisplay =
+    challenge.voting_end_date ||
+    (challenge.end_date ? votingEndFromEndDate(challenge.end_date) : undefined);
+  const resultsDateDisplay =
+    challenge.results_date ||
+    (challenge.end_date ? resultsDateFromEndDate(challenge.end_date) : undefined);
 
   const handlePostComment = async () => {
     if (!comment.trim() || !id) return;
@@ -312,8 +295,8 @@ export function ChallengeDetail() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Badge>{challenge?.category}</Badge>
-                <Badge variant={getPhaseBadgeVariant(challenge.phase)}>
-                  {getPhaseBadgeLabel(challenge.phase)}
+                <Badge variant={getPhaseBadgeVariant(phase)}>
+                  {getPhaseBadgeLabel(phase)}
                 </Badge>
                 <Badge>{challenge?.format}</Badge>
               </div>
@@ -346,7 +329,7 @@ export function ChallengeDetail() {
             {/* Timeline */}
             <Card>
               <h3 className="text-sm font-semibold mb-1">Challenge Timeline</h3>
-              <p className="text-xs text-yellow-500/90 mb-3">{getChallengeListCountdownLine(challenge)}</p>
+              <p className="text-xs text-yellow-500/90 mb-3">{getChallengeListCountdownLine(challenge, tickNow)}</p>
               <div className="space-y-4 text-sm">
                 {challenge.registration_deadline && (
                   <div className={phase === 'upcoming' || phase === 'entry_open' ? 'rounded-md border border-yellow-600/25 p-2 -m-1' : ''}>
@@ -455,6 +438,7 @@ export function ChallengeDetail() {
                 {(challenge?.start_date || challenge?.end_date) && (
                   <p className="text-[10px] text-[#6B7280] pt-1">Your time zone: {getTimeZoneName()}</p>
                 )}
+                <ChallengeCountdown challenge={challenge} phase={phase} tickMs={1000} className="pt-2" />
               </div>
               <div className="mt-4 pt-4 border-t border-[rgba(255,255,255,0.08)] space-y-2">
                 {getActionButtons()}
@@ -462,7 +446,7 @@ export function ChallengeDetail() {
               </div>
             </Card>
 
-            {hasEntered && challenge.phase !== 'voting' && challenge.phase !== 'completed' && (
+            {hasEntered && phase !== 'voting' && phase !== 'completed' && (
               <Card className="border-emerald-500/20 bg-emerald-500/5">
                 <div className="flex items-center gap-2 mb-2">
                   <Check size={16} className="text-emerald-400" />

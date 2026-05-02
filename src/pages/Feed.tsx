@@ -9,14 +9,63 @@ import { Input } from '@/components/ui/Input';
 import {
   getChallenges,
   getChallengeListCountdownLine,
-  getPhaseBadgeLabel,
-  getPhaseBadgeVariant,
+  votingEndFromEndDate,
 } from '@/lib/supabase/challenges';
+import { useLivePhase } from '@/hooks/useLivePhase';
+import { useNow } from '@/hooks/useNow';
+import { useCountdown } from '@/hooks/useCountdown';
+import { PhaseBadge } from '@/components/PhaseBadge';
 import type { Challenge, ChallengeFilters } from '@/lib/supabase/types';
 import { Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CATEGORIES = ['All', 'Art & Design', 'Music', 'Gaming', 'Photography', 'Writing', 'Dance', 'Comedy', 'Cooking', 'Fitness', 'Technology', 'Fashion', 'Film & Video', 'Education', 'Sports'];
+
+function FeedChallengeCard({ c, onOpen }: { c: Challenge; onOpen: () => void }) {
+  const phase = useLivePhase(c, 60_000);
+  const tickNow = useNow(60_000);
+  const target =
+    phase === 'upcoming' || phase === 'entry_open'
+      ? c.registration_deadline
+      : phase === 'entry_closed'
+        ? c.start_date
+        : phase === 'active'
+          ? c.end_date
+          : phase === 'voting'
+            ? c.voting_end_date || (c.end_date ? votingEndFromEndDate(c.end_date) : null)
+            : null;
+  const countdown = useCountdown(target ?? undefined, 60_000);
+
+  return (
+    <Card onClick={onOpen} className="overflow-hidden p-0 cursor-pointer hover:border-[rgba(255,255,255,0.15)] transition-colors">
+      <div className="relative">
+        <img src={c.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-36 object-cover" loading="lazy" />
+        <PhaseBadge challenge={c} tickMs={60_000} className="absolute top-2 left-2" />
+        <Badge variant={c.prize_type === 'cash' ? 'gold' : 'default'} className="absolute top-2 right-2">
+          {c.prize_type?.replace('_', ' ')}
+        </Badge>
+        {['entry_closed', 'active', 'voting', 'completed'].includes(phase) && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="text-white font-black text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-white/20">CLOSED</span>
+          </div>
+        )}
+      </div>
+      <div className="p-4">
+        <p className="text-xs text-[#9CA3AF] mb-1">{c.category}</p>
+        <p className="font-semibold text-sm mb-1 line-clamp-1">{c.title}</p>
+        <p className="text-xs text-[#9CA3AF] line-clamp-2 mb-3">{c.description}</p>
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] text-[#9CA3AF] line-clamp-2">{getChallengeListCountdownLine(c, tickNow)}</span>
+          {!countdown.isExpired && phase !== 'completed' && (
+            <span className="text-[10px] text-yellow-500/80">{countdown.shortLabel} remaining</span>
+          )}
+          <span className="flex items-center gap-1 text-xs text-[#9CA3AF]"><Users size={12} />{c.current_participants}</span>
+          {c.entry_fee > 0 ? <span className="text-xs font-medium gold-text">{c.entry_fee} DC</span> : <span className="text-xs text-emerald-400">Free</span>}
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export function Feed() {
   const [category, setCategory] = useState('All');
@@ -76,32 +125,7 @@ export function Feed() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {challenges.map(c => (
-                <Card key={c.id} onClick={() => navigate(`/challenges/${c.id}`)} className="overflow-hidden p-0 cursor-pointer hover:border-[rgba(255,255,255,0.15)] transition-colors">
-                  <div className="relative">
-                    <img src={c.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-36 object-cover" loading="lazy" />
-                    <Badge variant={getPhaseBadgeVariant(c.phase)} className="absolute top-2 left-2">
-                      {getPhaseBadgeLabel(c.phase)}
-                    </Badge>
-                    <Badge variant={c.prize_type === 'cash' ? 'gold' : 'default'} className="absolute top-2 right-2">
-                      {c.prize_type?.replace('_', ' ')}
-                    </Badge>
-                    {['entry_closed', 'active', 'voting', 'completed'].includes(c.phase) && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <span className="text-white font-black text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-white/20">CLOSED</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <p className="text-xs text-[#9CA3AF] mb-1">{c.category}</p>
-                    <p className="font-semibold text-sm mb-1 line-clamp-1">{c.title}</p>
-                    <p className="text-xs text-[#9CA3AF] line-clamp-2 mb-3">{c.description}</p>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-[#9CA3AF] line-clamp-2">{getChallengeListCountdownLine(c)}</span>
-                      <span className="flex items-center gap-1 text-xs text-[#9CA3AF]"><Users size={12} />{c.current_participants}</span>
-                      {c.entry_fee > 0 ? <span className="text-xs font-medium gold-text">{c.entry_fee} DC</span> : <span className="text-xs text-emerald-400">Free</span>}
-                    </div>
-                  </div>
-                </Card>
+                <FeedChallengeCard key={c.id} c={c} onOpen={() => navigate(`/challenges/${c.id}`)} />
               ))}
             </div>
             {challenges.length === 0 && <p className="text-center text-[#9CA3AF] py-8">No challenges found</p>}
