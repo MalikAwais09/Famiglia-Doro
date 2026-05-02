@@ -1,15 +1,21 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { supabase } from '@/lib/supabase/client';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner';
+import {
+  getBalance,
+  getTransactions,
+  getDoroCoinPackages,
+  deductCoins as walletDeductCoins,
+  type DoroCoinPackage,
+} from '@/lib/supabase/wallet';
+import type { WalletTransaction } from '@/lib/supabase/types';
 
 interface WalletContextType {
   balance: number;
+  transactions: WalletTransaction[];
   loading: boolean;
+  packages: DoroCoinPackage[];
   refreshBalance: () => Promise<void>;
-  // These are kept for legacy compatibility but should ideally be done via backend
-  creditCoins: (amount: number, description?: string) => void;
-  deductCoins: (amount: number, description?: string) => boolean;
+  deductCoins: (amount: number, description?: string) => Promise<boolean>;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -17,26 +23,26 @@ const WalletContext = createContext<WalletContextType | null>(null);
 export function WalletProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const packages = getDoroCoinPackages();
 
   const refreshBalance = useCallback(async () => {
     if (!user) {
       setBalance(0);
+      setTransactions([]);
       setLoading(false);
       return;
     }
+
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('dorocoin_balance')
-        .eq('id', user.id)
-        .single();
-      
-      if (!error && data) {
-        setBalance(data.dorocoin_balance);
-      }
+      const nextBalance = await getBalance();
+      setBalance(nextBalance);
+      const page = await getTransactions(1, 20);
+      setTransactions(page.transactions);
     } catch (err) {
-      console.error('Failed to refresh balance:', err);
+      console.error('Failed to refresh wallet:', err);
     } finally {
       setLoading(false);
     }
@@ -46,52 +52,36 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     refreshBalance();
   }, [refreshBalance]);
 
-  // Real state update functions for frontend components
-  const creditCoins = useCallback(async (amount: number, description?: string) => {
-    if (!user) return;
-    
-    // Optimistic update
-    setBalance(prev => prev + amount);
-    
-    try {
-      // Fetch current
-      const { data: profile } = await supabase.from('profiles').select('dorocoin_balance').eq('id', user.id).single();
-      if (!profile) return;
-      
-      const newBalance = profile.dorocoin_balance + amount;
-      
-      // Update DB
-      await supabase.from('profiles').update({ dorocoin_balance: newBalance }).eq('id', user.id);
-      
-      // Log transaction
-      await supabase.from('wallet_transactions').insert({
-        user_id: user.id,
-        type: 'credit',
-        amount,
-        description: description || 'DoroCoins purchased/credited',
-        balance_after: newBalance,
-      });
-      
-      toast.success(`${amount} DC added to your wallet!`);
-    } catch (err) {
-      console.error('Failed to credit coins', err);
-      // Revert on failure
-      refreshBalance();
-    }
-  }, [user, refreshBalance]);
-
-  const deductCoins = useCallback((amount: number, description?: string): boolean => {
-    let success = false;
-    setBalance(prev => {
-      if (prev < amount) return prev;
-      success = true;
-      return prev - amount;
-    });
-    return success;
-  }, []);
+  const deductCoins = useCallback(
+    async (amount: number, description?: string): Promise<boolean> => {
+      if (!user?.id) return false;
+      const result = await walletDeductCoins(user.id, amount, description ?? '');
+      if (result.success) {
+        setBalance(result.newBalance);
+        try {
+          const page = await getTransactions(1, 20);
+          setTransactions(page.transactions);
+        } catch {
+          /* ignore list refresh errors */
+        }
+        return true;
+      }
+      return false;
+    },
+    [user],
+  );
 
   return (
-    <WalletContext.Provider value={{ balance, loading, refreshBalance, creditCoins, deductCoins }}>
+    <WalletContext.Provider
+      value={{
+        balance,
+        transactions,
+        loading,
+        packages,
+        refreshBalance,
+        deductCoins,
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );

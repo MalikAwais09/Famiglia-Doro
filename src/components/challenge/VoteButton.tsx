@@ -32,7 +32,7 @@ export function VoteButton({ submissionId, challengeId, onVote }: VoteButtonProp
   const handlePaidVote = async () => {
     setIsLoading(true);
     try {
-      if (recordPaidVote(submissionId, challengeId)) {
+      if (await recordPaidVote(submissionId, challengeId)) {
         setShowPaidConfirm(false);
         onVote?.();
       }

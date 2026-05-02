@@ -25,7 +25,7 @@ export const useChallengeEntry = () => {
     return submissionStorage.getByChallengeId(challengeId).find(s => s.userId === userId) || null;
   };
 
-  const enterChallenge = (
+  const enterChallenge = async (
     challengeId: string,
     entryFee: number,
     paymentMethod: 'dorocoin' | 'card' | 'free',
@@ -33,7 +33,7 @@ export const useChallengeEntry = () => {
     challengeImage?: string,
     challengeCategory?: string,
     challengePhase?: string,
-  ): boolean => {
+  ): Promise<boolean> => {
     if (!userId || !userName) {
       toast.error('Must be logged in');
       return false;
@@ -49,7 +49,11 @@ export const useChallengeEntry = () => {
         toast.error('Insufficient DoroCoins');
         return false;
       }
-      deductCoins(entryFee, `Entry fee: ${challengeTitle || challengeId}`);
+      const ok = await deductCoins(entryFee, `Entry fee: ${challengeTitle || challengeId}`);
+      if (!ok) {
+        toast.error('Could not deduct DoroCoins');
+        return false;
+      }
     }
 
     const entry = {

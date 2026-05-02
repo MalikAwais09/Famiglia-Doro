@@ -33,13 +33,13 @@ export const useVoting = () => {
     return true;
   };
 
-  const recordPaidVote = (submissionId: string, challengeId: string): boolean => {
+  const recordPaidVote = async (submissionId: string, challengeId: string): Promise<boolean> => {
     if (!userId) return false;
     if (balance < 1) {
       toast.error('Insufficient DoroCoins (need 1)');
       return false;
     }
-    if (!deductCoins(1, `vote_${submissionId}`)) return false;
+    if (!(await deductCoins(1, `vote_${submissionId}`))) return false;
     submissionStorage.addVote(submissionId, userId);
     voteStorage.record({
       id: generateId('vote'),
