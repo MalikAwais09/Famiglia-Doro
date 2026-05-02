@@ -45,7 +45,9 @@ export async function getLeaderboard(
 
   if (error) throw error;
 
-  const rows = (data ?? []).map((p) => ({
+  const rows = data ?? [];
+  return rows.map((p, i) => ({
+    rank: i + 1,
     id: p.id,
     name: p.name,
     avatar_url: p.avatar_url,
@@ -53,34 +55,6 @@ export async function getLeaderboard(
     points: p.points,
     wins: p.wins,
     challenges_count: p.challenges_count,
-  }));
-
-  // Sort by primary metric, then win ratio as a tie-breaker
-  rows.sort((a, b) => {
-    // Primary sort
-    if (type === 'wins') {
-      if (b.wins !== a.wins) return b.wins - a.wins;
-    } else {
-      if (b.points !== a.points) return b.points - a.points;
-    }
-
-    // Secondary sort: Win Ratio (wins / challenges_count)
-    const ratioA = a.challenges_count > 0 ? a.wins / a.challenges_count : 0;
-    const ratioB = b.challenges_count > 0 ? b.wins / b.challenges_count : 0;
-    
-    if (ratioB !== ratioA) return ratioB - ratioA;
-
-    // Tertiary sort: Points (if type was wins) or Wins (if type was points)
-    const tertiary = type === 'wins' ? b.points - a.points : b.wins - a.wins;
-    if (tertiary !== 0) return tertiary;
-
-    // Final tie-breaker: Challenges Count (important for 0 points/0 wins case)
-    return b.challenges_count - a.challenges_count;
-  });
-
-  return rows.map((p, i) => ({
-    rank: i + 1,
-    ...p,
   }));
 }
 
