@@ -71,11 +71,24 @@ function NotificationsDropdown({ onClose }: { onClose: () => void }) {
     <div className="absolute right-0 top-10 w-80 bg-[#1C1C1F] border border-[rgba(255,255,255,0.08)] rounded-lg shadow-xl z-50">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
         <span className="text-sm font-semibold">Notifications</span>
-        <button onClick={() => { markAllAsRead(); onClose(); }} className="text-xs text-yellow-500 hover:underline">Mark all read</button>
+        <button
+          onClick={() => {
+            void markAllAsRead().then(() => onClose());
+          }}
+          className="text-xs text-yellow-500 hover:underline"
+        >
+          Mark all read
+        </button>
       </div>
       <div className="max-h-64 overflow-y-auto">
         {notifications.slice(0, 5).map(n => (
-          <button key={n.id} onClick={() => { markAsRead(n.id); onClose(); }} className={`w-full text-left px-4 py-3 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#222225] transition-colors ${!n.read ? 'bg-[#161618]' : ''}`}>
+          <button
+            key={n.id}
+            onClick={() => {
+              void markAsRead(n.id).then(() => onClose());
+            }}
+            className={`w-full text-left px-4 py-3 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#222225] transition-colors ${!n.read ? 'bg-[#161618]' : ''}`}
+          >
             <p className="text-sm font-medium">{n.title}</p>
             <p className="text-xs text-[#9CA3AF] mt-0.5">{n.message}</p>
           </button>

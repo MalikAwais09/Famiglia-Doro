@@ -128,6 +128,35 @@ export async function createChallenge(payload: CreateChallengePayload): Promise<
   return getChallengeById(challenge.id);
 }
 
+// ── uploadCoverImage ──────────────────────────────────────────────────────
+export async function uploadCoverImage(challengeId: string, file: File): Promise<string> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user?.id;
+  if (!userId) throw new Error('Not authenticated');
+
+  const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
+  const path = `${userId}/${challengeId}/cover-${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage.from('challenge-covers').upload(path, file, {
+    upsert: true,
+  });
+
+  if (uploadError) throw uploadError;
+
+  const { data: publicUrlData } = supabase.storage.from('challenge-covers').getPublicUrl(path);
+  const url = publicUrlData.publicUrl;
+
+  const { error: updateError } = await supabase
+    .from('challenges')
+    .update({ cover_image_url: url })
+    .eq('id', challengeId)
+    .eq('created_by', userId);
+
+  if (updateError) throw updateError;
+
+  return url;
+}
+
 // ── updateChallenge ───────────────────────────────────────────────────────
 export async function updateChallenge(id: string, payload: UpdateChallengePayload): Promise<Challenge> {
   const { rules, ...challengeData } = payload;
