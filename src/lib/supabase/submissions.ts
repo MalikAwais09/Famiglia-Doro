@@ -15,6 +15,17 @@ export async function submitWork(challengeId: string, data: SubmitWorkData): Pro
   const userId = sessionData.session?.user?.id;
   if (!userId) throw new Error('Not authenticated');
 
+  // Verify challenge timing and phase
+  const { data: challenge } = await supabase
+    .from('challenges')
+    .select('title, created_by, end_date, phase')
+    .eq('id', challengeId)
+    .single();
+
+  if (challenge && challenge.end_date && new Date() > new Date(challenge.end_date)) {
+    throw new Error('Submission period has ended for this challenge.');
+  }
+
   // Verify entry
   const { data: entry } = await supabase
     .from('entries')
@@ -73,7 +84,6 @@ export async function submitWork(challengeId: string, data: SubmitWorkData): Pro
   if (submitError) throw submitError;
 
   // Notify creator
-  const { data: challenge } = await supabase.from('challenges').select('title, created_by').eq('id', challengeId).single();
   if (challenge && challenge.created_by !== userId) {
     const { data: me } = await supabase.from('profiles').select('name').eq('id', userId).single();
     await supabase.from('notifications').insert({
@@ -152,9 +162,13 @@ export async function updateSubmission(submissionId: string, data: { title: stri
 
   const { data: challenge } = await supabase
     .from('challenges')
-    .select('phase')
+    .select('phase, end_date')
     .eq('id', existing.challenge_id)
     .single();
+
+  if (challenge && challenge.end_date && new Date() > new Date(challenge.end_date)) {
+    throw new Error('Cannot update submission after the challenge has ended');
+  }
 
   if (challenge && (challenge.phase === 'voting' || challenge.phase === 'completed')) {
     throw new Error('Cannot update submission after voting has started');

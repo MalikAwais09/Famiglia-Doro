@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { useWallet } from '@/context/WalletContext';
 import { AgreementModal } from '@/components/agreements/AgreementModal';
 import { toast } from 'sonner';
+import { Users } from 'lucide-react';
 import { getChallengeById } from '@/lib/supabase/challenges';
 import { enterChallenge, getMyEntry } from '@/lib/supabase/entries';
 import { supabase } from '@/lib/supabase/client';
@@ -32,6 +33,21 @@ export function ChallengeEnter() {
       setPageLoading(true);
       try {
         const data = await getChallengeById(challengeId);
+        if (!data) {
+          toast.error('Challenge not found');
+          navigate('/challenges');
+          return;
+        }
+
+        // Timing check
+        const now = new Date();
+        const deadline = data.registration_deadline ? new Date(data.registration_deadline) : null;
+        if (deadline && now > deadline) {
+          toast.error('Registration for this challenge has closed');
+          navigate(`/challenges/${challengeId}`);
+          return;
+        }
+
         setChallenge(data);
 
         const entry = await getMyEntry(challengeId);
@@ -47,7 +63,7 @@ export function ChallengeEnter() {
       console.log('ChallengeEnter: loading data for', challengeId);
       load();
     }
-  }, [challengeId]);
+  }, [challengeId, navigate]);
 
   if (pageLoading) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Loading...</p></Section></Container>;
   if (!challenge) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Challenge not found</p></Section></Container>;
@@ -131,7 +147,13 @@ export function ChallengeEnter() {
           <div className="p-4">
             <Badge className="mb-2">{challenge?.category}</Badge>
             <h2 className="text-lg font-semibold">{challenge?.title}</h2>
-            <p className="text-sm text-[#9CA3AF] mt-1">{challenge?.description}</p>
+            <p className="text-sm text-[#9CA3AF] mt-1 mb-4">{challenge?.description}</p>
+            <div className="flex items-center justify-between pt-4 border-t border-[rgba(255,255,255,0.08)]">
+              <span className="text-xs text-[#9CA3AF]">Participants</span>
+              <span className="text-sm font-medium flex items-center gap-1">
+                <Users size={14} /> {challenge?.current_participants ?? 0}{challenge?.max_participants ? `/${challenge.max_participants}` : ''}
+              </span>
+            </div>
           </div>
         </Card>
 

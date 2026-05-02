@@ -88,7 +88,7 @@ export const MOCK_CHALLENGES: Challenge[] = [
   },
   {
     id: 'ch_7', title: 'Coding Challenge: AI Innovation', description: 'Build an innovative AI-powered application in 72 hours. Impress our community with your technical skills.', category: 'Technology',
-    coverImage: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600', format: 'group', phase: 'entry_closed', prizeType: 'cash', prizeDescription: '$2,000 Cash Prize',
+    coverImage: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600', format: 'group', phase: 'closed', prizeType: 'cash', prizeDescription: '$2,000 Cash Prize',
     entryFee: 30, maxParticipants: 40, currentParticipants: 40, createdBy: 'user_2', createdByName: 'Sofia Rivera',
     registrationDeadline: p(1), startDate: d(1), endDate: d(4), votingEndDate: d(7), resultsDate: d(9),
     rules: ['Standard platform rules apply.', '72-hour build time.', 'Open source required.', 'No plagiarism or unauthorized content.'],

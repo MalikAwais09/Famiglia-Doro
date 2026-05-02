@@ -14,7 +14,7 @@ import { getChallenges } from '@/lib/supabase/challenges';
 import type { Challenge, ChallengeFilters } from '@/lib/supabase/types';
 import { toast } from 'sonner';
 
-const STATUSES = ['All', 'upcoming', 'entry_open', 'voting', 'completed'];
+const STATUSES = ['All', 'upcoming', 'entry_open', 'on_going', 'closed', 'voting', 'completed'];
 
 export function Challenges() {
   const [status, setStatus] = useState('All');
@@ -67,7 +67,7 @@ export function Challenges() {
             {STATUSES.map(s => (
               <button key={s} onClick={() => setStatus(s)}
                 className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${status === s ? 'gold-gradient text-black font-semibold border-transparent' : 'border-[rgba(255,255,255,0.08)] text-[#9CA3AF]'}`}>
-                {s === 'All' ? 'All' : s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {s === 'All' ? 'All' : s === 'on_going' ? 'Ongoing' : s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </button>
             ))}
           </div>
@@ -88,7 +88,7 @@ export function Challenges() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {challenges.map(c => (
-                <Card key={c.id} onClick={() => navigate(`/challenges/${c.id}`)} className="overflow-hidden p-0">
+                <Card key={c.id} onClick={() => navigate(`/challenges/${c.id}`)} className="overflow-hidden p-0 cursor-pointer hover:border-[rgba(255,255,255,0.15)] transition-colors">
                   <div className="relative">
                     <img
                       src={c.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'}
@@ -96,21 +96,23 @@ export function Challenges() {
                       className="w-full h-36 object-cover"
                       loading="lazy"
                     />
-                    <Badge
-                      variant={c.phase === 'entry_open' ? 'success' : c.phase === 'upcoming' ? 'info' : 'default'}
-                      className="absolute top-2 left-2"
-                    >
-                      {c.phase.replace('_', ' ')}
+                    <Badge variant={c.phase === 'entry_open' ? 'success' : c.phase === 'on_going' ? 'warning' : c.phase === 'upcoming' ? 'info' : 'default'} className="absolute top-2 left-2">
+                      {c.phase === 'closed' || c.phase === 'on_going' ? 'Closed' : c.phase?.replace('_', ' ')}
                     </Badge>
                     <Badge className="absolute top-2 right-2">{c.format}</Badge>
+                    {(c.phase === 'closed' || c.phase === 'on_going') && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <span className="text-white font-black text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-white/20">CLOSED</span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
                     <p className="text-xs text-[#9CA3AF] mb-1">{c.category}</p>
-                    <p className="font-semibold text-sm mb-1">{c.title}</p>
+                    <p className="font-semibold text-sm mb-1 line-clamp-1">{c.title}</p>
                     <p className="text-xs text-[#9CA3AF] line-clamp-2 mb-3">{c.description}</p>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-[#9CA3AF]">{getTimeUntil(c.start_date ?? '')}</span>
-                      <span className="flex items-center gap-1"><Users size={12} />{c.current_participants}</span>
+                      <span className="flex items-center gap-1 text-[#9CA3AF]"><Users size={12} />{c.current_participants}</span>
                       {c.entry_fee > 0
                         ? <span className="gold-text font-medium">{c.entry_fee} DC</span>
                         : <span className="text-emerald-400">Free</span>}

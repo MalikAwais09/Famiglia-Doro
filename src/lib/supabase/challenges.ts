@@ -11,18 +11,33 @@ import type {
 function computePhase(c: {
   registration_deadline: string | null;
   start_date: string | null;
+  end_date: string | null;
   voting_end_date: string | null;
   phase: ChallengePhase;
 }): ChallengePhase {
   const now = new Date();
   const reg = c.registration_deadline ? new Date(c.registration_deadline) : null;
   const start = c.start_date ? new Date(c.start_date) : null;
+  const end = c.end_date ? new Date(c.end_date) : null;
   const votingEnd = c.voting_end_date ? new Date(c.voting_end_date) : null;
 
   if (votingEnd && now > votingEnd) return 'completed';
-  if (start && now > start) return 'voting';
-  if (reg && now > reg) return 'entry_closed';
+  if (end && now > end) return 'voting';
+  if (start && now > start) return 'on_going';
+  if (reg && now > reg) return 'closed';
+  
+  // If phase is 'upcoming' but we are before reg deadline, it might be 'entry_open'
+  if (c.phase === 'upcoming' && (!reg || now <= reg)) {
+     // This depends on how 'upcoming' is used. 
+     // If registration hasn't started yet, it stays 'upcoming'.
+     // But we don't have a 'registration_start' date.
+     // For now, if it's 'upcoming' in DB, let it stay 'upcoming' until manually opened?
+     // Or just return entry_open if now <= reg.
+     return 'entry_open';
+  }
+
   if (reg && now <= reg) return 'entry_open';
+
   return c.phase; // fallback to stored phase
 }
 
@@ -53,7 +68,11 @@ export async function getChallenges(filters?: ChallengeFilters): Promise<Challen
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data ?? []) as Challenge[];
+  const challenges = (data ?? []) as Challenge[];
+  return challenges.map(c => ({
+    ...c,
+    phase: computePhase(c)
+  }));
 }
 
 // ── getChallengeById ──────────────────────────────────────────────────────
@@ -83,7 +102,11 @@ export async function getChallengeById(id: string): Promise<Challenge | null> {
     );
   }
 
-  return data as Challenge;
+  const challenge = data as Challenge;
+  return {
+    ...challenge,
+    phase: computePhase(challenge)
+  };
 }
 
 // ── createChallenge ───────────────────────────────────────────────────────

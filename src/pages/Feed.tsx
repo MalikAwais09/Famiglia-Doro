@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { getChallenges } from '@/lib/supabase/challenges';
 import type { Challenge, ChallengeFilters } from '@/lib/supabase/types';
-import { getTimeUntil } from '@/lib/utils';
 import { Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -75,12 +74,17 @@ export function Feed() {
                 <Card key={c.id} onClick={() => navigate(`/challenges/${c.id}`)} className="overflow-hidden p-0 cursor-pointer hover:border-[rgba(255,255,255,0.15)] transition-colors">
                   <div className="relative">
                     <img src={c.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-36 object-cover" loading="lazy" />
-                    <Badge variant={c.phase === 'entry_open' ? 'success' : c.phase === 'upcoming' ? 'info' : 'default'} className="absolute top-2 left-2">
-                      {c.phase?.replace('_', ' ')}
+                    <Badge variant={c.phase === 'entry_open' ? 'success' : c.phase === 'on_going' ? 'warning' : c.phase === 'upcoming' ? 'info' : 'default'} className="absolute top-2 left-2">
+                      {c.phase === 'closed' || c.phase === 'on_going' ? 'Closed' : c.phase?.replace('_', ' ')}
                     </Badge>
                     <Badge variant={c.prize_type === 'cash' ? 'gold' : 'default'} className="absolute top-2 right-2">
                       {c.prize_type?.replace('_', ' ')}
                     </Badge>
+                    {(c.phase === 'closed' || c.phase === 'on_going') && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <span className="text-white font-black text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-white/20">CLOSED</span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
                     <p className="text-xs text-[#9CA3AF] mb-1">{c.category}</p>

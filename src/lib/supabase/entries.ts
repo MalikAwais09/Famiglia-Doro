@@ -10,11 +10,19 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
   // Check challenge state
   const { data: challenge, error: challengeError } = await supabase
     .from('challenges')
-    .select('id, phase, entry_fee, current_participants, max_participants, title, created_by')
+    .select('id, phase, entry_fee, current_participants, max_participants, title, created_by, registration_deadline')
     .eq('id', challengeId)
     .single();
 
   if (challengeError || !challenge) throw new Error('Challenge not found');
+  
+  // Timing check
+  const now = new Date();
+  const deadline = challenge.registration_deadline ? new Date(challenge.registration_deadline) : null;
+  if (deadline && now > deadline) {
+    throw new Error('Registration for this challenge has closed');
+  }
+
   if (challenge.phase !== 'entry_open') throw new Error('Challenge is not open for entries');
   if (challenge.max_participants && challenge.current_participants >= challenge.max_participants) {
     throw new Error('Challenge is full');

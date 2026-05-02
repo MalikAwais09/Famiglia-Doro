@@ -4,7 +4,7 @@
 
 export type UserRole = 'free' | 'creatorPro' | 'eliteHost';
 export type ChallengeFormat = '1v1' | 'group' | 'tournament';
-export type ChallengePhase = 'upcoming' | 'entry_open' | 'entry_closed' | 'voting' | 'completed';
+export type ChallengePhase = 'upcoming' | 'entry_open' | 'closed' | 'on_going' | 'voting' | 'completed';
 export type PrizeType = 'cash' | 'digital' | 'physical' | 'bragging_rights';
 export type ScoringSystem = '1_rounder' | 'best_of_3' | 'best_of_5' | 'best_of_7' | 'points_based';
 export type JudgeMethod = 'community_vote' | 'creator_decision' | 'hybrid';

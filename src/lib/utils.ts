@@ -124,7 +124,7 @@ export const addDays = (date: Date, days: number): Date => {
 export const computeChallengePhase = (challenge: Challenge): Challenge['phase'] => {
   const now = Date.now();
   if (now < new Date(challenge.registrationDeadline).getTime()) return 'entry_open';
-  if (now < new Date(challenge.startDate).getTime()) return 'entry_closed';
+  if (now < new Date(challenge.startDate).getTime()) return 'closed';
   if (now < new Date(challenge.endDate).getTime()) return 'voting';
   return 'completed';
 };
@@ -133,7 +133,7 @@ export const getPhaseLabel = (phase: Challenge['phase']): string => {
   const labels: Record<Challenge['phase'], string> = {
     upcoming: 'Registration Opens Soon',
     entry_open: 'Registration Open',
-    entry_closed: 'Registration Closed',
+    closed: 'Closed',
     voting: 'Voting Phase',
     pending_verification: 'Pending Verification',
     completed: 'Completed',

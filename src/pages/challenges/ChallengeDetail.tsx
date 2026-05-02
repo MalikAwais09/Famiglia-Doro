@@ -5,8 +5,8 @@ import { Section } from '@/layout/Section';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { formatDateTime, formatDate } from '@/lib/utils';
-import { Users, Share2, Check, Loader2 } from 'lucide-react';
+import { formatDateTime } from '@/lib/utils';
+import { Users, Share2, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { AgreementModal } from '@/components/agreements/AgreementModal';
 import { Input } from '@/components/ui/Input';
@@ -14,7 +14,6 @@ import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal'
 import { getChallengeById } from '@/lib/supabase/challenges';
 import { getMyEntry, withdrawEntry } from '@/lib/supabase/entries';
 import { getComments, postComment, type Comment } from '@/lib/supabase/comments';
-import { supabase } from '@/lib/supabase/client';
 import type { Challenge } from '@/lib/supabase/types';
 import { useWallet } from '@/context/WalletContext';
 
@@ -121,19 +120,30 @@ export function ChallengeDetail() {
     const now = Date.now();
     const isRegistrationOver = challenge?.registration_deadline && new Date(challenge.registration_deadline).getTime() < now;
     const isStarted = challenge?.start_date && new Date(challenge.start_date).getTime() <= now;
+    const isEnded = challenge?.end_date && new Date(challenge.end_date).getTime() <= now;
 
     if (hasEntered) {
       if (challenge?.phase === 'completed') {
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
       }
 
+      if (isEnded || challenge?.phase === 'voting') {
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs mb-2">
+              <AlertCircle size={14} />
+              <span>Submission period has ended</span>
+            </div>
+            <Button fullWidth variant="secondary" onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>
+          </div>
+        );
+      }
+
       return (
         <div className="space-y-2">
-          {isStarted ? (
-            <Button fullWidth onClick={() => setSubmitOpen(true)}>Start Challenge (Submit Work)</Button>
-          ) : (
-            <Button fullWidth onClick={() => setSubmitOpen(true)}>Submit Your Work</Button>
-          )}
+          <Button fullWidth onClick={() => setSubmitOpen(true)}>
+            {isStarted ? 'Submit Your Work' : 'Start Challenge (Submit Work)'}
+          </Button>
           <Button fullWidth variant="secondary" onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>
           {!isStarted && (
             <Button fullWidth variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" loading={withdrawLoading} onClick={handleWithdraw}>Withdraw Entry</Button>
@@ -142,7 +152,13 @@ export function ChallengeDetail() {
       );
     }
 
-    if (isRegistrationOver || challenge?.phase === 'entry_closed') {
+    if (isRegistrationOver || challenge?.phase === 'closed' || challenge?.phase === 'on_going') {
+      if (challenge?.phase === 'voting') {
+        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
+      }
+      if (challenge?.phase === 'completed') {
+        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
+      }
       return <Button disabled fullWidth>Registration Closed</Button>;
     }
 
@@ -154,7 +170,6 @@ export function ChallengeDetail() {
           <Button 
             fullWidth 
             onClick={() => {
-              console.log('Navigating to enter challenge:', id);
               navigate(`/challenges/${id}/enter`);
             }}
           >
@@ -185,7 +200,6 @@ export function ChallengeDetail() {
     }
   };
 
-  // Build rules array from joined challenge_rules safely
   const rulesArray = Array.isArray(challenge?.rules) ? challenge.rules.map(r => r?.rule_text).filter(Boolean) : [];
 
   return (
@@ -202,8 +216,8 @@ export function ChallengeDetail() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Badge>{challenge?.category}</Badge>
-                <Badge variant={challenge?.phase === 'entry_open' ? 'success' : challenge?.phase === 'upcoming' ? 'info' : 'default'}>
-                  {challenge?.phase?.replace('_', ' ')}
+                <Badge variant={challenge?.phase === 'entry_open' ? 'success' : challenge?.phase === 'on_going' ? 'warning' : challenge?.phase === 'upcoming' ? 'info' : 'default'}>
+                  {challenge?.phase === 'closed' ? 'Closed' : challenge?.phase?.replace('_', ' ')}
                 </Badge>
                 <Badge>{challenge?.format}</Badge>
               </div>
@@ -321,14 +335,14 @@ export function ChallengeDetail() {
               </div>
             </Card>
 
-            {hasEntered && (challenge.phase === 'entry_open' || challenge.phase === 'voting') && (
+            {hasEntered && challenge.phase !== 'voting' && challenge.phase !== 'completed' && (
               <Card className="border-emerald-500/20 bg-emerald-500/5">
                 <div className="flex items-center gap-2 mb-2">
                   <Check size={16} className="text-emerald-400" />
                   <span className="text-sm font-medium text-emerald-400">You are entered</span>
                 </div>
                 <p className="text-xs text-[#9CA3AF] mb-3">Submit your work before the deadline to participate in voting.</p>
-                <Button fullWidth onClick={() => setSubmitOpen(true)}>Submit Your Work</Button>
+                {/* We rely on getActionButtons above for the actual submit button to handle the 'isEnded' check */}
               </Card>
             )}
 
@@ -350,6 +364,7 @@ export function ChallengeDetail() {
           <li>Both parties must agree before sponsorship is finalized.</li>
           <li>Platform retains standard 15% fee.</li>
           <li>Sponsorship terms are binding once confirmed.</li>
+          <li>Anti-fraud measures are in place.</li>
         </ul>
       </AgreementModal>
       <SubmissionFormModal
