@@ -8,13 +8,17 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { useRole } from '@/context/RoleContext';
-import { getTimeUntil } from '@/lib/utils';
 import { Plus, Users, Loader2 } from 'lucide-react';
-import { getChallenges } from '@/lib/supabase/challenges';
+import {
+  getChallenges,
+  getChallengeListCountdownLine,
+  getPhaseBadgeLabel,
+  getPhaseBadgeVariant,
+} from '@/lib/supabase/challenges';
 import type { Challenge, ChallengeFilters } from '@/lib/supabase/types';
 import { toast } from 'sonner';
 
-const STATUSES = ['All', 'upcoming', 'entry_open', 'on_going', 'closed', 'voting', 'completed'];
+const STATUSES = ['All', 'upcoming', 'entry_open', 'entry_closed', 'active', 'voting', 'completed'] as const;
 
 export function Challenges() {
   const [status, setStatus] = useState('All');
@@ -67,7 +71,7 @@ export function Challenges() {
             {STATUSES.map(s => (
               <button key={s} onClick={() => setStatus(s)}
                 className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${status === s ? 'gold-gradient text-black font-semibold border-transparent' : 'border-[rgba(255,255,255,0.08)] text-[#9CA3AF]'}`}>
-                {s === 'All' ? 'All' : s === 'on_going' ? 'Ongoing' : s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {s === 'All' ? 'All' : s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </button>
             ))}
           </div>
@@ -96,11 +100,11 @@ export function Challenges() {
                       className="w-full h-36 object-cover"
                       loading="lazy"
                     />
-                    <Badge variant={c.phase === 'entry_open' ? 'success' : c.phase === 'on_going' ? 'warning' : c.phase === 'upcoming' ? 'info' : 'default'} className="absolute top-2 left-2">
-                      {c.phase === 'closed' || c.phase === 'on_going' ? 'Closed' : c.phase?.replace('_', ' ')}
+                    <Badge variant={getPhaseBadgeVariant(c.phase)} className="absolute top-2 left-2">
+                      {getPhaseBadgeLabel(c.phase)}
                     </Badge>
                     <Badge className="absolute top-2 right-2">{c.format}</Badge>
-                    {(c.phase === 'closed' || c.phase === 'on_going') && (
+                    {['entry_closed', 'active', 'voting', 'completed'].includes(c.phase) && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                         <span className="text-white font-black text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-white/20">CLOSED</span>
                       </div>
@@ -111,7 +115,7 @@ export function Challenges() {
                     <p className="font-semibold text-sm mb-1 line-clamp-1">{c.title}</p>
                     <p className="text-xs text-[#9CA3AF] line-clamp-2 mb-3">{c.description}</p>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#9CA3AF]">{getTimeUntil(c.start_date ?? '')}</span>
+                      <span className="text-[#9CA3AF] line-clamp-2">{getChallengeListCountdownLine(c)}</span>
                       <span className="flex items-center gap-1 text-[#9CA3AF]"><Users size={12} />{c.current_participants}</span>
                       {c.entry_fee > 0
                         ? <span className="gold-text font-medium">{c.entry_fee} DC</span>

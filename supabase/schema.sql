@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS public.challenges (
   video_url             TEXT,
   format                TEXT        NOT NULL CHECK (format IN ('1v1', 'group', 'tournament')),
   phase                 TEXT        NOT NULL DEFAULT 'upcoming'
-                                    CHECK (phase IN ('upcoming','entry_open','entry_closed','voting','completed')),
+                                    CHECK (phase IN ('upcoming','entry_open','entry_closed','active','voting','completed')),
   prize_type            TEXT        CHECK (prize_type IN ('cash','digital','physical','bragging_rights')),
   prize_description     TEXT,
   entry_fee             INTEGER     NOT NULL DEFAULT 0,

@@ -19,7 +19,7 @@ export const challengeService = {
   getActive: (): Challenge[] =>
     challengeService.getAll().filter(c => {
       const phase = computeChallengePhase(c);
-      return phase === 'entry_open' || phase === 'voting';
+      return ['upcoming', 'entry_open', 'voting'].includes(phase);
     }),
 
   getUpcoming: (): Challenge[] =>

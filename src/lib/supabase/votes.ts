@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { getLocalCalendarDateString } from '@/lib/utils/dateUtils';
+import { computePhase } from '@/lib/supabase/challenges';
 import type { Vote, Winner, Profile } from './types';
 
 // ── castVote ──────────────────────────────────────────────────────────────
@@ -19,13 +20,15 @@ export async function castVote(submissionId: string, isPaid: boolean): Promise<{
   if (submission.user_id === userId) throw new Error('Cannot vote for your own submission');
 
   // Check phase
-  const { data: challenge } = await supabase
+  const { data: challengeRow } = await supabase
     .from('challenges')
-    .select('phase')
+    .select('phase, registration_deadline, start_date, end_date, voting_end_date, results_date')
     .eq('id', submission.challenge_id)
     .single();
 
-  if (challenge?.phase !== 'voting') throw new Error('Voting is not open for this challenge');
+  if (!challengeRow || computePhase(challengeRow) !== 'voting') {
+    throw new Error('Voting is not open for this challenge');
+  }
 
   // Check unique vote constraint (a user can only vote on a specific submission ONCE)
   const { count: voteCount } = await supabase

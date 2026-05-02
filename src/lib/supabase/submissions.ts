@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { formatLocalDateTime } from '@/lib/utils/dateUtils';
+import { computePhase } from '@/lib/supabase/challenges';
 import type { Submission, ContentType, Profile } from './types';
 
 interface SubmitWorkData {
@@ -115,11 +116,13 @@ export async function submitWork(challengeId: string, data: SubmitWorkData): Pro
 
 // ── getSubmissions ────────────────────────────────────────────────────────
 export async function getSubmissions(challengeId: string): Promise<(Submission & { user: Profile })[]> {
-  const { data: challenge } = await supabase
+  const { data: challengeRow } = await supabase
     .from('challenges')
-    .select('phase')
+    .select('phase, registration_deadline, start_date, end_date, voting_end_date, results_date')
     .eq('id', challengeId)
     .single();
+
+  const effectivePhase = challengeRow ? computePhase(challengeRow) : null;
 
   const { data, error } = await supabase
     .from('submissions')
@@ -134,10 +137,9 @@ export async function getSubmissions(challengeId: string): Promise<(Submission &
 
   let subs = (data ?? []) as (Submission & { user: Profile })[];
 
-  // Shuffle order if in voting phase to prevent placement bias
-  if (challenge?.phase === 'voting') {
+  if (effectivePhase === 'voting') {
     subs = subs.sort(() => Math.random() - 0.5);
-  } else if (challenge?.phase === 'completed') {
+  } else if (effectivePhase === 'completed') {
     // Sort by votes if completed
     subs = subs.sort((a, b) => b.votes_count - a.votes_count);
   }
@@ -177,17 +179,19 @@ export async function updateSubmission(submissionId: string, data: { title: stri
   if (!existing) throw new Error('Submission not found');
   if (existing.user_id !== userId) throw new Error('Not authorized');
 
-  const { data: challenge } = await supabase
+  const { data: challengeRow } = await supabase
     .from('challenges')
-    .select('phase, end_date')
+    .select('phase, end_date, registration_deadline, start_date, voting_end_date, results_date')
     .eq('id', existing.challenge_id)
     .single();
 
-  if (challenge && challenge.end_date && new Date() > new Date(challenge.end_date)) {
+  const p = challengeRow ? computePhase(challengeRow) : null;
+
+  if (challengeRow && challengeRow.end_date && new Date() > new Date(challengeRow.end_date)) {
     throw new Error('Cannot update submission after the challenge has ended');
   }
 
-  if (challenge && (challenge.phase === 'voting' || challenge.phase === 'completed')) {
+  if (p === 'voting' || p === 'completed') {
     throw new Error('Cannot update submission after voting has started');
   }
 

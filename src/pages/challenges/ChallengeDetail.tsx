@@ -12,7 +12,14 @@ import { toast } from 'sonner';
 import { AgreementModal } from '@/components/agreements/AgreementModal';
 import { Input } from '@/components/ui/Input';
 import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal';
-import { getChallengeById } from '@/lib/supabase/challenges';
+import {
+  getChallengeById,
+  getChallengeListCountdownLine,
+  getPhaseBadgeLabel,
+  getPhaseBadgeVariant,
+  votingEndFromEndDate,
+  resultsDateFromEndDate,
+} from '@/lib/supabase/challenges';
 import { getMyEntry, withdrawEntry, getPublicParticipants } from '@/lib/supabase/entries';
 import { getMySubmission } from '@/lib/supabase/submissions';
 import { useAuth } from '@/context/AuthContext';
@@ -38,7 +45,8 @@ export function ChallengeDetail() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const { refreshBalance } = useWallet();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const isAuthenticated = !!user;
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +130,13 @@ export function ChallengeDetail() {
   const isFree = challenge.prize_type === 'bragging_rights' || challenge.entry_fee === 0;
   const totalPool = challenge.entry_fee * challenge.current_participants;
   const isCreator = !!profile?.id && profile.id === challenge.created_by;
+  const phase = challenge.phase;
+  const votingEndDisplay =
+    challenge.voting_end_date ||
+    (challenge.end_date ? votingEndFromEndDate(challenge.end_date) : undefined);
+  const resultsDateDisplay =
+    challenge.results_date ||
+    (challenge.end_date ? resultsDateFromEndDate(challenge.end_date) : undefined);
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -151,27 +166,35 @@ export function ChallengeDetail() {
 
   const getActionButtons = () => {
     const now = Date.now();
-    const isRegistrationOver = challenge?.registration_deadline && new Date(challenge.registration_deadline).getTime() < now;
     const isStarted = challenge?.start_date && new Date(challenge.start_date).getTime() <= now;
     const isEnded = challenge?.end_date && new Date(challenge.end_date).getTime() <= now;
     const startMs = challenge?.start_date ? new Date(challenge.start_date).getTime() : null;
     const endMs = challenge?.end_date ? new Date(challenge.end_date).getTime() : null;
     const beforeStart = startMs !== null && now < startMs;
     const afterEnd = endMs !== null && now > endMs;
-    const canSubmit =
+
+    const showEnterButton =
+      !isCreator &&
+      isAuthenticated &&
+      (phase === 'upcoming' || phase === 'entry_open') &&
+      !hasEntered;
+
+    const showSubmitButton =
+      !isCreator &&
       hasEntered &&
+      phase === 'active' &&
       !hasSubmitted &&
       !beforeStart &&
-      !afterEnd &&
-      challenge?.phase !== 'voting' &&
-      challenge?.phase !== 'completed';
+      !afterEnd;
+
+    const isFull = challenge?.max_participants && challenge.current_participants >= challenge.max_participants;
 
     if (hasEntered) {
-      if (challenge?.phase === 'completed') {
+      if (phase === 'completed') {
         return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
       }
 
-      if (isEnded || challenge?.phase === 'voting') {
+      if (isEnded || phase === 'voting') {
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs mb-2">
@@ -195,57 +218,67 @@ export function ChallengeDetail() {
             </div>
           ) : afterEnd ? (
             <p className="text-xs text-red-400 text-center">Submission deadline has passed.</p>
-          ) : canSubmit ? (
+          ) : showSubmitButton ? (
             <Button fullWidth onClick={() => setSubmitOpen(true)}>Submit Your Work</Button>
           ) : null}
           <Button fullWidth variant="secondary" onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>
-          {!isStarted && (
+          {!isStarted && ['upcoming', 'entry_open', 'entry_closed'].includes(phase) && (
             <Button fullWidth variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" loading={withdrawLoading} onClick={handleWithdraw}>Withdraw Entry</Button>
           )}
         </div>
       );
     }
 
-    const isFull = challenge?.max_participants && challenge.current_participants >= challenge.max_participants;
-
-    if (challenge?.phase === 'closed' || challenge?.phase === 'on_going' || isRegistrationOver || isFull) {
-      if (challenge?.phase === 'voting') {
-        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
-      }
-      if (challenge?.phase === 'completed') {
-        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
-      }
-      return <Button disabled fullWidth>{isFull ? 'Challenge Full' : 'Registration Closed'}</Button>;
+    if (phase === 'completed') {
+      return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
     }
 
-    switch (challenge?.phase) {
-      case 'upcoming':
-        return <Button disabled fullWidth>Registration opens soon</Button>;
-      case 'entry_open':
-        if (isCreator) {
-          return (
-            <div className="w-full flex justify-center">
-              <Badge>You created this challenge</Badge>
-            </div>
-          );
-        }
+    if (phase === 'voting') {
+      return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
+    }
+
+    if (phase === 'active' || phase === 'entry_closed') {
+      if (phase === 'entry_closed' && challenge.start_date) {
         return (
-          <Button 
-            fullWidth 
-            onClick={() => {
-              navigate(`/challenges/${id}/enter`);
-            }}
-          >
-            {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
-          </Button>
+          <div className="space-y-2">
+            <p className="text-xs text-[#9CA3AF] text-center">Entries are closed. Challenge starts {formatRelativeTime(challenge.start_date)}.</p>
+            <p className="text-[10px] text-[#6B7280] text-center">{formatLocalDateTime(challenge.start_date)}</p>
+            <Button disabled fullWidth>Entries closed</Button>
+          </div>
         );
-      case 'voting':
-        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/voting`)}>View Submissions and Vote</Button>;
-      case 'completed':
-        return <Button fullWidth onClick={() => navigate(`/challenges/${id}/winners`)}>View Winners</Button>;
-      default:
-        return null;
+      }
+      return (
+        <Button disabled fullWidth>
+          {phase === 'active' ? 'Submissions in progress' : 'Entries closed'}
+        </Button>
+      );
     }
+
+    if (showEnterButton) {
+      if (isFull) {
+        return <Button disabled fullWidth>Challenge Full</Button>;
+      }
+      return (
+        <Button
+          fullWidth
+          onClick={() => {
+            navigate(`/challenges/${id}/enter`);
+          }}
+        >
+          {isFree ? 'Enter Free Challenge' : `Enter Now (${challenge?.entry_fee ?? 0} DC)`}
+        </Button>
+      );
+    }
+
+    if (isCreator && (phase === 'upcoming' || phase === 'entry_open')) {
+      return (
+        <div className="w-full flex justify-center">
+          <Badge>You created this challenge</Badge>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const handlePostComment = async () => {
@@ -279,8 +312,8 @@ export function ChallengeDetail() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Badge>{challenge?.category}</Badge>
-                <Badge variant={challenge?.phase === 'entry_open' ? 'success' : challenge?.phase === 'on_going' ? 'warning' : challenge?.phase === 'upcoming' ? 'info' : 'default'}>
-                  {challenge?.phase === 'closed' || challenge?.phase === 'on_going' ? 'Closed' : challenge?.phase?.replace('_', ' ')}
+                <Badge variant={getPhaseBadgeVariant(challenge.phase)}>
+                  {getPhaseBadgeLabel(challenge.phase)}
                 </Badge>
                 <Badge>{challenge?.format}</Badge>
               </div>
@@ -312,24 +345,49 @@ export function ChallengeDetail() {
 
             {/* Timeline */}
             <Card>
-              <h3 className="text-sm font-semibold mb-3">Timeline</h3>
-              <div className="space-y-3">
-                {[
-                  { label: 'Registration Deadline', date: challenge?.registration_deadline },
-                  { label: 'Challenge Start', date: challenge?.start_date },
-                  { label: 'Challenge End', date: challenge?.end_date },
-                  ...(challenge?.voting_end_date ? [{ label: 'Voting End', date: challenge.voting_end_date }] : []),
-                  ...(challenge?.results_date ? [{ label: 'Results', date: challenge.results_date }] : []),
-                ].filter(t => t.date).map((t, i) => {
-                  const past = new Date(t.date!) < new Date();
-                  return (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className={`w-2.5 h-2.5 rounded-full ${past ? 'bg-emerald-400' : 'bg-gray-600'}`} />
-                      <span className="text-sm flex-1">{t.label}</span>
-                      <span className="text-xs text-[#9CA3AF]">{formatDateTime(t.date!)}</span>
+              <h3 className="text-sm font-semibold mb-1">Challenge Timeline</h3>
+              <p className="text-xs text-yellow-500/90 mb-3">{getChallengeListCountdownLine(challenge)}</p>
+              <div className="space-y-4 text-sm">
+                {challenge.registration_deadline && (
+                  <div className={phase === 'upcoming' || phase === 'entry_open' ? 'rounded-md border border-yellow-600/25 p-2 -m-1' : ''}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Check size={14} className={phase === 'upcoming' || phase === 'entry_open' ? 'text-yellow-500' : 'text-emerald-400'} />
+                      <span className="font-medium">Registration</span>
                     </div>
-                  );
-                })}
+                    <p className="text-xs text-[#9CA3AF] pl-6">Closes: {formatDateTime(challenge.registration_deadline)}</p>
+                  </div>
+                )}
+                {challenge.start_date && challenge.end_date && (
+                  <div className={phase === 'active' || phase === 'entry_closed' ? 'rounded-md border border-yellow-600/25 p-2 -m-1' : ''}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Check size={14} className={phase === 'active' || phase === 'entry_closed' ? 'text-yellow-500' : 'text-emerald-400'} />
+                      <span className="font-medium">Submission phase</span>
+                    </div>
+                    <p className="text-xs text-[#9CA3AF] pl-6">
+                      {formatLocalDateTime(challenge.start_date)} → {formatLocalDateTime(challenge.end_date)}
+                    </p>
+                  </div>
+                )}
+                {challenge.end_date && votingEndDisplay && (
+                  <div className={phase === 'voting' ? 'rounded-md border border-yellow-600/25 p-2 -m-1' : ''}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Check size={14} className={phase === 'voting' ? 'text-yellow-500' : 'text-emerald-400'} />
+                      <span className="font-medium">Voting phase</span>
+                    </div>
+                    <p className="text-xs text-[#9CA3AF] pl-6">
+                      {formatLocalDateTime(challenge.end_date)} → {formatLocalDateTime(votingEndDisplay)} (7 days, auto-starts when submissions close)
+                    </p>
+                  </div>
+                )}
+                {resultsDateDisplay && (
+                  <div className={phase === 'completed' ? 'rounded-md border border-yellow-600/25 p-2 -m-1' : ''}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Check size={14} className={phase === 'completed' ? 'text-yellow-500' : 'text-gray-600'} />
+                      <span className="font-medium">Results</span>
+                    </div>
+                    <p className="text-xs text-[#9CA3AF] pl-6">{formatLocalDateTime(resultsDateDisplay)}</p>
+                  </div>
+                )}
               </div>
               <p className="text-[10px] text-[#6B7280] mt-3">
                 Times shown in your time zone ({getTimeZoneName()}).

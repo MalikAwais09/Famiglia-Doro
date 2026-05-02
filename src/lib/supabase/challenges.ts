@@ -1,4 +1,5 @@
 import { supabase } from './client';
+import { formatRelativeTime } from '@/lib/utils/dateUtils';
 import type { Challenge, ChallengePhase, ChallengeFilters, CreateChallengePayload, UpdateChallengePayload } from './types';
 
 // ── getEntryCountForChallenge ─────────────────────────────────────────────
@@ -12,37 +13,128 @@ export async function getEntryCountForChallenge(challengeId: string): Promise<nu
   return count ?? 0;
 }
 
+// ── Voting / results schedule (end_date + 7 / + 9 days) ───────────────────
+export function votingEndFromEndDate(endDateIso: string): string {
+  const end = new Date(endDateIso);
+  const d = new Date(end);
+  d.setDate(d.getDate() + 7);
+  return d.toISOString();
+}
+
+export function resultsDateFromEndDate(endDateIso: string): string {
+  const end = new Date(endDateIso);
+  const d = new Date(end);
+  d.setDate(d.getDate() + 9);
+  return d.toISOString();
+}
+
+function parseMs(d: unknown): number | null {
+  if (d == null || d === '') return null;
+  const t = new Date(d as string).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/** Effective voting end: stored column or end_date + 7 days */
+export function effectiveVotingEndMs(challenge: { end_date?: string | null; voting_end_date?: string | null }): number | null {
+  const stored = parseMs(challenge.voting_end_date);
+  if (stored != null) return stored;
+  const end = parseMs(challenge.end_date);
+  if (end == null) return null;
+  return new Date(votingEndFromEndDate(challenge.end_date as string)).getTime();
+}
+
 // ── computePhase ──────────────────────────────────────────────────────────
 export function computePhase(challenge: any): ChallengePhase {
-  // Use timestamps for reliable comparison across timezones
   const now = Date.now();
-  
-  const parse = (d: any) => d ? new Date(d).getTime() : null;
-  
-  const reg = parse(challenge.registration_deadline);
-  const start = parse(challenge.start_date);
-  const end = parse(challenge.end_date);
-  const vEnd = parse(challenge.voting_end_date);
 
-  // Debugging (optional, removed for production cleanliness)
-  // if (votingEnd && now > votingEnd) return 'completed';
-  
-  // Phase logic:
-  // 1. Completed: Voting period has ended
-  if (vEnd && now > vEnd) return 'completed';
-  
-  // 2. Voting: Challenge period has ended, but voting is still active
-  if (end && now > end) return 'voting';
-  
-  // 3. On Going: Challenge has started (past start_date) but not yet ended
-  if (start && now > start) return 'on_going';
-  
-  // 4. Closed: Registration deadline has passed, but challenge hasn't started yet
-  if (reg && now > reg) return 'closed';
-  
-  // 5. Entry Open: Default state if registration deadline is in the future
-  // Note: We could add an 'upcoming' phase here if we had a 'registration_starts_at' field
+  const reg = parseMs(challenge.registration_deadline);
+  const start = parseMs(challenge.start_date);
+  const end = parseMs(challenge.end_date);
+  const vEnd = effectiveVotingEndMs(challenge);
+
+  if (reg != null && now < reg) return 'upcoming';
+
+  if (reg != null && start != null && now >= reg && now < start) return 'entry_closed';
+
+  if (start != null && end != null && now >= start && now < end) return 'active';
+
+  if (end != null && vEnd != null && now >= end && now < vEnd) return 'voting';
+
+  if (vEnd != null && now >= vEnd) return 'completed';
+
+  if (start != null && end == null && now >= start) return 'active';
+
+  if (start == null && end != null && now < end) return 'active';
+
   return 'entry_open';
+}
+
+/** One-line countdown / status for list cards and detail timeline */
+export function getChallengeListCountdownLine(challenge: Challenge | Record<string, unknown>): string {
+  const ch = challenge as Challenge;
+  const phase = computePhase(ch);
+  const reg = ch.registration_deadline;
+  const start = ch.start_date;
+  const end = ch.end_date;
+  const vEndIso =
+    ch.voting_end_date ||
+    (ch.end_date ? votingEndFromEndDate(ch.end_date) : null);
+
+  try {
+    switch (phase) {
+      case 'upcoming':
+        return reg ? `Entries close ${formatRelativeTime(reg)}` : '';
+      case 'entry_open':
+        return reg ? `Entries close ${formatRelativeTime(reg)}` : '';
+      case 'entry_closed':
+        return start ? `Challenge starts ${formatRelativeTime(start)}` : '';
+      case 'active':
+        return end ? `Submissions close ${formatRelativeTime(end)}` : '';
+      case 'voting':
+        return vEndIso ? `Voting ends ${formatRelativeTime(vEndIso)}` : '';
+      case 'completed': {
+        const anchor = vEndIso || end;
+        return anchor ? `Ended ${formatRelativeTime(anchor)}` : 'Ended';
+      }
+      default:
+        return '';
+    }
+  } catch {
+    return '';
+  }
+}
+
+export function getPhaseBadgeLabel(phase: ChallengePhase): string {
+  const labels: Record<ChallengePhase, string> = {
+    upcoming: 'Upcoming',
+    entry_open: 'Entries Open',
+    entry_closed: 'Entries Closed',
+    active: 'Active',
+    voting: 'Voting Open',
+    completed: 'Completed',
+  };
+  return labels[phase] ?? String(phase);
+}
+
+export function getPhaseBadgeVariant(
+  phase: ChallengePhase
+): 'default' | 'success' | 'warning' | 'info' | 'gold' {
+  switch (phase) {
+    case 'entry_open':
+      return 'success';
+    case 'active':
+      return 'info';
+    case 'entry_closed':
+      return 'warning';
+    case 'voting':
+      return 'warning';
+    case 'upcoming':
+      return 'default';
+    case 'completed':
+      return 'default';
+    default:
+      return 'default';
+  }
 }
 
 // ── getChallenges ────────────────────────────────────────────────────────
@@ -124,15 +216,31 @@ export async function createChallenge(payload: CreateChallengePayload): Promise<
   const userId = sessionData.session?.user?.id;
   if (!userId) throw new Error('Not authenticated');
 
-  const { rules, ...challengeData } = payload;
+  const { rules, phase: _payloadPhase, voting_end_date: _ve, results_date: _rd, ...rest } = payload;
+
+  if (!rest.end_date) throw new Error('end_date is required');
+
+  const voting_end_date = votingEndFromEndDate(rest.end_date);
+  const results_date = resultsDateFromEndDate(rest.end_date);
+
+  const rowForPhase = {
+    ...rest,
+    voting_end_date,
+    results_date,
+    current_participants: 0,
+  };
+
+  const phase = computePhase(rowForPhase);
 
   const { data: challenge, error: challengeError } = await supabase
     .from('challenges')
     .insert({
-      ...challengeData,
+      ...rest,
+      voting_end_date,
+      results_date,
       created_by: userId,
       current_participants: 0,
-      phase: 'entry_open' // Initial phase
+      phase,
     })
     .select()
     .single();
@@ -143,12 +251,10 @@ export async function createChallenge(payload: CreateChallengePayload): Promise<
     const rulesToInsert = rules.map((text, index) => ({
       challenge_id: challenge.id,
       rule_text: text,
-      order_index: index
+      order_index: index,
     }));
 
-    const { error: rulesError } = await supabase
-      .from('challenge_rules')
-      .insert(rulesToInsert);
+    const { error: rulesError } = await supabase.from('challenge_rules').insert(rulesToInsert);
 
     if (rulesError) throw rulesError;
   }
@@ -189,21 +295,58 @@ export async function uploadCoverImage(challengeId: string, file: File): Promise
 export async function updateChallenge(id: string, payload: UpdateChallengePayload): Promise<Challenge> {
   const { rules, ...challengeData } = payload;
 
-  const { error: updateError } = await supabase
-    .from('challenges')
-    .update(challengeData)
-    .eq('id', id);
+  let voting_end_date = challengeData.voting_end_date;
+  let results_date = challengeData.results_date;
+
+  if (challengeData.end_date) {
+    if (voting_end_date === undefined) {
+      voting_end_date = votingEndFromEndDate(challengeData.end_date);
+    }
+    if (results_date === undefined) {
+      results_date = resultsDateFromEndDate(challengeData.end_date);
+    }
+  }
+
+  const updatePayload: Record<string, unknown> = { ...challengeData };
+  if (voting_end_date !== undefined) updatePayload.voting_end_date = voting_end_date;
+  if (results_date !== undefined) updatePayload.results_date = results_date;
+
+  const shouldRecomputePhase =
+    challengeData.end_date !== undefined ||
+    challengeData.start_date !== undefined ||
+    challengeData.registration_deadline !== undefined ||
+    challengeData.voting_end_date !== undefined ||
+    challengeData.results_date !== undefined;
+
+  if (shouldRecomputePhase) {
+    const { data: existing } = await supabase
+      .from('challenges')
+      .select('registration_deadline, start_date, end_date, voting_end_date, results_date, current_participants')
+      .eq('id', id)
+      .single();
+
+    if (existing) {
+      const merged = {
+        ...existing,
+        ...updatePayload,
+        voting_end_date: (updatePayload.voting_end_date as string | undefined) ?? existing.voting_end_date,
+        results_date: (updatePayload.results_date as string | undefined) ?? existing.results_date,
+      };
+      updatePayload.phase = computePhase(merged);
+    }
+  }
+
+  const { error: updateError } = await supabase.from('challenges').update(updatePayload).eq('id', id);
 
   if (updateError) throw updateError;
 
   if (rules) {
-    // Replace rules
     await supabase.from('challenge_rules').delete().eq('challenge_id', id);
     if (rules.length > 0) {
       const rulesToInsert = rules.map((text, index) => ({
         challenge_id: id,
         rule_text: text,
-        order_index: index
+        order_index: index,
       }));
       await supabase.from('challenge_rules').insert(rulesToInsert);
     }

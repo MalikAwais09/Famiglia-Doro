@@ -97,7 +97,6 @@ export function CreateChallenge() {
         start_date: localDateTimeInputToUtcIso(form.challengeStart),
         end_date: localDateTimeInputToUtcIso(form.challengeEnd),
         rules: allRules,
-        phase: 'entry_open',
       };
 
       // Wrap createChallenge in a 10-second timeout to prevent infinite loading

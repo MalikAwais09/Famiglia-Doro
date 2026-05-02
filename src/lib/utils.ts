@@ -1,4 +1,5 @@
 import type { Challenge, Submission, LeaderboardEntry } from '@/types';
+import { computePhase as computeSupabaseChallengePhase } from '@/lib/supabase/challenges';
 import {
   formatLocalDateTime,
   formatLocalDate,
@@ -100,40 +101,31 @@ export const addDays = (date: Date, days: number): Date => {
 };
 
 export const computeChallengePhase = (challenge: any): Challenge['phase'] => {
-  const now = Date.now();
-  
-  // Support both snake_case (Supabase) and camelCase (Mock/Legacy)
-  const regDeadline = challenge.registration_deadline || challenge.registrationDeadline;
-  const startDate = challenge.start_date || challenge.startDate;
-  const endDate = challenge.end_date || challenge.endDate;
-  const vEndDate = challenge.voting_end_date || challenge.votingEndDate;
-
-  const reg = regDeadline ? new Date(regDeadline).getTime() : 0;
-  const start = startDate ? new Date(startDate).getTime() : 0;
-  const end = endDate ? new Date(endDate).getTime() : 0;
-  const vEnd = vEndDate ? new Date(vEndDate).getTime() : 0;
-
-  if (vEnd && now > vEnd) return 'completed';
-  if (end && now > end) return 'voting';
-  if (start && now > start) return 'on_going';
-  if (reg && now > reg) return 'closed';
-  return 'entry_open';
+  return computeSupabaseChallengePhase({
+    registration_deadline: challenge.registration_deadline || challenge.registrationDeadline,
+    start_date: challenge.start_date || challenge.startDate,
+    end_date: challenge.end_date || challenge.endDate,
+    voting_end_date: challenge.voting_end_date || challenge.votingEndDate,
+    results_date: challenge.results_date || challenge.resultsDate,
+  }) as Challenge['phase'];
 };
 
 export const getPhaseLabel = (phase: Challenge['phase']): string => {
-  const labels: Record<Challenge['phase'], string> = {
-    upcoming: 'Registration Opens Soon',
-    entry_open: 'Registration Open',
-    on_going: 'Closed', // Label as Closed per user request
-    closed: 'Closed',
-    voting: 'Voting Phase',
+  const labels: Record<string, string> = {
+    upcoming: 'Upcoming',
+    entry_open: 'Entries Open',
+    entry_closed: 'Entries Closed',
+    active: 'Active',
+    on_going: 'Active',
+    closed: 'Entries Closed',
+    voting: 'Voting Open',
     pending_verification: 'Pending Verification',
     completed: 'Completed',
   };
-  return labels[phase];
+  return labels[phase] ?? String(phase);
 };
 
-export const computeWinners = (challengeId: string, submissions: Submission[], totalEntries: number) => {
+export const computeWinners = (_challengeId: string, submissions: Submission[], totalEntries: number) => {
   if (submissions.length === 0) return [];
   const sorted = [...submissions].sort((a, b) => b.votes - a.votes);
   const percentages: Record<number, number> = { 1: 0.5, 2: 0.3, 3: 0.2 };

@@ -7,7 +7,7 @@ export const phaseManager = {
   },
 
   getPhaseSequence: (): Challenge['phase'][] => {
-    return ['upcoming', 'entry_open', 'on_going', 'closed', 'voting', 'pending_verification', 'completed'];
+    return ['upcoming', 'entry_open', 'entry_closed', 'active', 'voting', 'completed', 'on_going', 'closed', 'pending_verification'];
   },
 
   canTransition: (from: Challenge['phase'], to: Challenge['phase']): boolean => {
@@ -24,34 +24,38 @@ export const phaseManager = {
   getPhaseLabel: (phase: Challenge['phase']): string => getPhaseLabel(phase),
 
   getPhaseDescription: (phase: Challenge['phase']): string => {
-    const descriptions: Record<Challenge['phase'], string> = {
-      upcoming: 'Challenge not yet open for registration',
+    const descriptions: Partial<Record<Challenge['phase'], string>> = {
+      upcoming: 'Registration open until deadline',
       entry_open: 'Now accepting entries',
-      on_going: 'Challenge is active',
-      closed: 'Registration is closed',
+      entry_closed: 'Entries closed; challenge starting soon',
+      active: 'Submission window open',
+      on_going: 'Submission window open',
+      closed: 'Entries closed',
       voting: 'Community voting is active',
       pending_verification: 'Winners pending verification',
       completed: 'Challenge has ended',
     };
-    return descriptions[phase];
+    return descriptions[phase] ?? '';
   },
 
   getPhaseColor: (phase: Challenge['phase']): string => {
-    const colors: Record<Challenge['phase'], string> = {
+    const colors: Partial<Record<Challenge['phase'], string>> = {
       upcoming: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
       entry_open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      entry_closed: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+      active: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
       on_going: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       closed: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
       voting: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
       pending_verification: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
       completed: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
     };
-    return colors[phase];
+    return colors[phase] ?? '';
   },
 
-  allowsEntries: (phase: Challenge['phase']): boolean => phase === 'entry_open',
+  allowsEntries: (phase: Challenge['phase']): boolean => phase === 'upcoming' || phase === 'entry_open',
 
-  allowsSubmissions: (phase: Challenge['phase']): boolean => ['entry_open', 'on_going', 'closed'].includes(phase),
+  allowsSubmissions: (phase: Challenge['phase']): boolean => phase === 'active' || phase === 'on_going',
 
   allowsVoting: (phase: Challenge['phase']): boolean => phase === 'voting',
 

@@ -6,7 +6,12 @@ import { PageHeader } from '@/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
-import { getChallenges } from '@/lib/supabase/challenges';
+import {
+  getChallenges,
+  getChallengeListCountdownLine,
+  getPhaseBadgeLabel,
+  getPhaseBadgeVariant,
+} from '@/lib/supabase/challenges';
 import type { Challenge, ChallengeFilters } from '@/lib/supabase/types';
 import { Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -74,13 +79,13 @@ export function Feed() {
                 <Card key={c.id} onClick={() => navigate(`/challenges/${c.id}`)} className="overflow-hidden p-0 cursor-pointer hover:border-[rgba(255,255,255,0.15)] transition-colors">
                   <div className="relative">
                     <img src={c.cover_image_url || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600'} alt="" className="w-full h-36 object-cover" loading="lazy" />
-                    <Badge variant={c.phase === 'entry_open' ? 'success' : c.phase === 'on_going' ? 'warning' : c.phase === 'upcoming' ? 'info' : 'default'} className="absolute top-2 left-2">
-                      {c.phase === 'closed' || c.phase === 'on_going' ? 'Closed' : c.phase?.replace('_', ' ')}
+                    <Badge variant={getPhaseBadgeVariant(c.phase)} className="absolute top-2 left-2">
+                      {getPhaseBadgeLabel(c.phase)}
                     </Badge>
                     <Badge variant={c.prize_type === 'cash' ? 'gold' : 'default'} className="absolute top-2 right-2">
                       {c.prize_type?.replace('_', ' ')}
                     </Badge>
-                    {(c.phase === 'closed' || c.phase === 'on_going') && (
+                    {['entry_closed', 'active', 'voting', 'completed'].includes(c.phase) && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                         <span className="text-white font-black text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-white/20">CLOSED</span>
                       </div>
@@ -90,7 +95,8 @@ export function Feed() {
                     <p className="text-xs text-[#9CA3AF] mb-1">{c.category}</p>
                     <p className="font-semibold text-sm mb-1 line-clamp-1">{c.title}</p>
                     <p className="text-xs text-[#9CA3AF] line-clamp-2 mb-3">{c.description}</p>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-[#9CA3AF] line-clamp-2">{getChallengeListCountdownLine(c)}</span>
                       <span className="flex items-center gap-1 text-xs text-[#9CA3AF]"><Users size={12} />{c.current_participants}</span>
                       {c.entry_fee > 0 ? <span className="text-xs font-medium gold-text">{c.entry_fee} DC</span> : <span className="text-xs text-emerald-400">Free</span>}
                     </div>

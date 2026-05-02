@@ -11,7 +11,16 @@ export interface User {
   challenges: number;
 }
 
-export type ChallengePhase = 'upcoming' | 'entry_open' | 'on_going' | 'closed' | 'voting' | 'pending_verification' | 'completed';
+export type ChallengePhase =
+  | 'upcoming'
+  | 'entry_open'
+  | 'entry_closed'
+  | 'active'
+  | 'on_going'
+  | 'closed'
+  | 'voting'
+  | 'pending_verification'
+  | 'completed';
 export type ChallengeFormat = '1v1' | 'group' | 'tournament';
 export type PrizeType = 'cash' | 'digital' | 'physical' | 'bragging';
 export type EventType = '1v1' | 'group' | 'tournament';

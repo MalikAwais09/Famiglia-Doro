@@ -7,13 +7,10 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SubmissionFormModal } from '@/components/challenge/SubmissionFormModal';
-import { getMyEntries } from '@/lib/supabase/entries';
+import { getMyEntries, type MyEntryListItem } from '@/lib/supabase/entries';
+import { getPhaseBadgeLabel, getPhaseBadgeVariant } from '@/lib/supabase/challenges';
 import { formatRelativeTime, formatLocalDateTime } from '@/lib/utils/dateUtils';
 import { Loader2 } from 'lucide-react';
-
-function phaseLabel(phase: string) {
-  return phase.replace('_', ' ');
-}
 
 function placementLabel(placement: number | null) {
   if (placement === 1) return '1st';
@@ -71,6 +68,7 @@ export function MyEntries() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {entries.map((e) => {
           const ch = e.challenge;
+          const ph = ch?.phase;
           const now = Date.now();
           const startMs = ch?.start_date ? new Date(ch.start_date).getTime() : null;
           const endMs = ch?.end_date ? new Date(ch.end_date).getTime() : null;
@@ -79,7 +77,7 @@ export function MyEntries() {
           const canSubmit =
             !e.hasSubmitted &&
             !!ch &&
-            ['entry_open', 'on_going'].includes(ch.phase) &&
+            ph === 'active' &&
             !beforeStart &&
             !afterEnd;
           const place = placementLabel(e.placement);
@@ -96,7 +94,7 @@ export function MyEntries() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge>{ch?.category || 'General'}</Badge>
                   {ch?.format && <Badge variant="default">{ch.format}</Badge>}
-                  {ch?.phase && <Badge variant="info">{phaseLabel(ch.phase)}</Badge>}
+                  {ph && <Badge variant={getPhaseBadgeVariant(ph)}>{getPhaseBadgeLabel(ph)}</Badge>}
                   {e.isWinner && <Badge variant="success">Winner</Badge>}
                   {place && <Badge variant="success">{place}</Badge>}
                 </div>
@@ -115,13 +113,22 @@ export function MyEntries() {
                     <span className="text-emerald-400">Free</span>
                   )}
                 </div>
-                {!e.hasSubmitted && beforeStart && ch?.start_date && (
+                {ph === 'upcoming' && ch?.start_date && (
+                  <p className="text-xs text-[#9CA3AF]">Challenge starts {formatRelativeTime(ch.start_date)}</p>
+                )}
+                {ph === 'entry_closed' && ch?.start_date && (
+                  <p className="text-xs text-[#9CA3AF]">Challenge starts {formatRelativeTime(ch.start_date)}</p>
+                )}
+                {!e.hasSubmitted && beforeStart && ch?.start_date && ph === 'active' && (
                   <p className="text-xs text-[#9CA3AF]">
                     Opens on {formatLocalDateTime(ch.start_date)}
                   </p>
                 )}
-                {afterEnd && !e.hasSubmitted && (
+                {afterEnd && !e.hasSubmitted && ph === 'active' && (
                   <p className="text-xs text-red-400">Submission deadline has passed</p>
+                )}
+                {ph === 'completed' && !e.isWinner && (
+                  <p className="text-xs text-[#6B7280]">Better luck next time</p>
                 )}
                 <div className="flex gap-2 pt-2">
                   <Button variant="secondary" fullWidth onClick={() => ch?.id && navigate(`/challenges/${ch.id}`)}>
@@ -132,7 +139,12 @@ export function MyEntries() {
                       Submit Your Work
                     </Button>
                   )}
-                  {e.hasSubmitted && (
+                  {ph === 'voting' && (
+                    <Button fullWidth variant="ghost" onClick={() => ch?.id && navigate(`/challenges/${ch.id}/voting`)}>
+                      View &amp; Vote
+                    </Button>
+                  )}
+                  {e.hasSubmitted && ph !== 'voting' && (
                     <Button fullWidth variant="ghost" onClick={() => ch?.id && navigate(`/challenges/${ch.id}/voting`)}>
                       Vote
                     </Button>

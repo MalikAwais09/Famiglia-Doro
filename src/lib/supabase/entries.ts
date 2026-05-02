@@ -35,7 +35,9 @@ export async function enterChallenge(challengeId: string): Promise<Entry> {
   const realParticipantCount = existingEntryCount ?? 0;
 
   const effectivePhase = computePhase(challenge);
-  if (effectivePhase !== 'entry_open') throw new Error('Challenge is not open for entries');
+  if (effectivePhase !== 'upcoming' && effectivePhase !== 'entry_open') {
+    throw new Error('Challenge is not open for entries');
+  }
   if (challenge.max_participants && realParticipantCount >= challenge.max_participants) {
     throw new Error(`This challenge is full (${realParticipantCount}/${challenge.max_participants} participants)`);
   }
@@ -187,7 +189,7 @@ export async function getMyEntries(): Promise<MyEntryListItem[]> {
     const ch = row.challenges as Challenge | null;
     const subs = Array.isArray(row.submissions) ? row.submissions : row.submissions ? [row.submissions] : [];
     const sub = subs[0] ?? null;
-    const phase = ch ? computePhase(ch) : ('entry_open' as ChallengePhase);
+    const phase = ch ? computePhase(ch) : ('upcoming' as ChallengePhase);
     const challengeWithPhase = ch ? { ...ch, phase } : null;
     return {
       entryId: row.id,
@@ -208,15 +210,19 @@ export async function withdrawEntry(challengeId: string, entryId: string): Promi
   const userId = sessionData.session?.user?.id;
   if (!userId) throw new Error('Not authenticated');
 
-  // Check phase
   const { data: challenge } = await supabase
     .from('challenges')
-    .select('phase, title, current_participants')
+    .select(
+      'phase, title, current_participants, registration_deadline, start_date, end_date, voting_end_date, results_date'
+    )
     .eq('id', challengeId)
     .single();
 
   if (!challenge) throw new Error('Challenge not found');
-  if (challenge.phase !== 'entry_open') throw new Error('Cannot withdraw after entry phase is closed');
+  const withdrawPhase = computePhase(challenge);
+  if (!['upcoming', 'entry_open', 'entry_closed'].includes(withdrawPhase)) {
+    throw new Error('Cannot withdraw after the submission window has started');
+  }
 
   // Check entry
   const { data: entry } = await supabase
