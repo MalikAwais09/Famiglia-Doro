@@ -31,6 +31,9 @@ import { useWallet } from '@/context/WalletContext';
 import { useLivePhase } from '@/hooks/useLivePhase';
 import { useNow } from '@/hooks/useNow';
 import { ChallengeCountdown } from '@/components/ChallengeCountdown';
+import { supabase } from '@/lib/supabase/client';
+import { computeWinners } from '@/lib/supabase/votes';
+import { WinnersDisplay } from '@/components/WinnersDisplay';
 
 export function ChallengeDetail() {
   const { id } = useParams();
@@ -49,6 +52,9 @@ export function ChallengeDetail() {
   const [participants, setParticipants] = useState<Pick<Profile, 'id' | 'name' | 'avatar_url' | 'role'>[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [entryAgreementOpen, setEntryAgreementOpen] = useState(false);
+  const [winnersComputed, setWinnersComputed] = useState(false);
+  const [computingWinners, setComputingWinners] = useState(false);
+  const [isCurrentUserWinner, setIsCurrentUserWinner] = useState(false);
 
   const { refreshBalance } = useWallet();
   const { profile, user } = useAuth();
@@ -102,6 +108,37 @@ export function ChallengeDetail() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (phase !== 'completed' || !challenge?.id) return;
+    supabase
+      .from('winners')
+      .select('id, user_id')
+      .eq('challenge_id', challenge.id)
+      .then(({ data }) => {
+        setWinnersComputed((data?.length ?? 0) > 0);
+        setIsCurrentUserWinner(!!profile?.id && (data ?? []).some((w) => w.user_id === profile.id));
+      });
+  }, [phase, challenge?.id, profile?.id]);
+
+  const handleComputeWinners = async () => {
+    if (!challenge?.id) return;
+    setComputingWinners(true);
+    try {
+      const result = await computeWinners(challenge.id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      setWinnersComputed(true);
+      setIsCurrentUserWinner(!!profile?.id && (result.winners ?? []).some((w) => w.userId === profile.id));
+      toast.success('Winners announced!');
+    } catch {
+      toast.error('Failed to compute winners');
+    } finally {
+      setComputingWinners(false);
+    }
+  };
+
   const getActionButtons = () => {
     if (!challenge || !id) return null;
 
@@ -128,6 +165,18 @@ export function ChallengeDetail() {
       !hasSubmitted &&
       !beforeStart &&
       !afterEnd;
+
+    if (isCreatorLocal && phase === 'completed' && !winnersComputed) {
+      return (
+        <Button fullWidth onClick={handleComputeWinners} disabled={computingWinners}>
+          {computingWinners ? 'Computing...' : 'Announce Winners'}
+        </Button>
+      );
+    }
+
+    if (isCreatorLocal && phase === 'completed' && winnersComputed) {
+      return <p className="text-xs text-emerald-400 text-center">Winners have been announced</p>;
+    }
 
     const isFull = challenge?.max_participants && challenge.current_participants >= challenge.max_participants;
 
@@ -469,6 +518,16 @@ export function ChallengeDetail() {
                 <Button onClick={handlePostComment} loading={commentsLoading} disabled={!comment.trim()}>Post</Button>
               </div>
             </Card>
+
+            {phase === 'completed' && (
+              <Card>
+                <WinnersDisplay
+                  challengeId={challenge.id}
+                  isCurrentUserWinner={isCurrentUserWinner}
+                  currentUserId={profile?.id}
+                />
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}

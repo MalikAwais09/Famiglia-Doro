@@ -163,110 +163,106 @@ export async function getVoteStatus(challengeId: string): Promise<{ hasUsedFreeV
 }
 
 // ── computeWinners ────────────────────────────────────────────────────────
-export async function computeWinners(challengeId: string): Promise<(Winner & { user: Profile })[]> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user?.id;
-  if (!userId) throw new Error('Not authenticated');
+export async function computeWinners(
+  challengeId: string
+): Promise<{ success?: true; winners?: Array<{ placement: number; userId: string; submissionId: string }>; error?: string }> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUserId = sessionData.session?.user?.id;
+    if (!currentUserId) return { error: 'Not authenticated' };
 
-  const { data: challenge } = await supabase
-    .from('challenges')
-    .select('created_by, title')
-    .eq('id', challengeId)
-    .single();
+    const { data: challenge, error: challengeError } = await supabase
+      .from('challenges')
+      .select('id, title, phase, created_by')
+      .eq('id', challengeId)
+      .single();
 
-  if (!challenge || challenge.created_by !== userId) {
-    throw new Error('Only the creator can compute winners');
-  }
+    if (challengeError) return { error: challengeError.message };
+    if (!challenge) return { error: 'Challenge not found' };
+    if (challenge.created_by !== currentUserId) return { error: 'Only the creator can compute winners' };
 
-  // Get top 3 submissions
-  const { data: submissions } = await supabase
-    .from('submissions')
-    .select('id, user_id, title, votes_count')
-    .eq('challenge_id', challengeId)
-    .order('votes_count', { ascending: false })
-    .limit(3);
+    const { data: existingWinners, error: existingError } = await supabase
+      .from('winners')
+      .select('id')
+      .eq('challenge_id', challengeId)
+      .limit(1);
 
-  if (!submissions || submissions.length === 0) return [];
+    if (existingError) return { error: existingError.message };
+    if ((existingWinners?.length ?? 0) > 0) return { error: 'Winners already computed' };
 
-  const winnersToReturn = [];
-  const points = [100, 50, 25];
+    const { data: submissions, error: subError } = await supabase
+      .from('submissions')
+      .select('id, user_id, votes_count, title')
+      .eq('challenge_id', challengeId)
+      .order('votes_count', { ascending: false })
+      .limit(3);
 
-  for (let i = 0; i < submissions.length; i++) {
-    const sub = submissions[i];
-    const placement = (i + 1) as 1 | 2 | 3;
+    if (subError) return { error: subError.message };
+    if (!submissions || submissions.length === 0) {
+      return { error: 'No submissions found' };
+    }
 
-    // 1. Insert winner
-    const { data: winnerData } = await supabase.from('winners').insert({
-      challenge_id: challengeId,
-      user_id: sub.user_id,
-      submission_id: sub.id,
-      placement: placement,
-      prize_claimed: false
-    }).select().single();
+    const points = [100, 50, 25];
+    const winners: Array<{ placement: number; userId: string; submissionId: string }> = [];
 
-    // 2. Update submission
-    await supabase.from('submissions').update({
-      is_winner: true,
-      placement: placement
-    }).eq('id', sub.id);
+    for (let i = 0; i < submissions.length; i++) {
+      const sub = submissions[i];
+      const placement = i + 1;
 
-    const { error: addPointsErr } = await supabase.rpc('add_points', { user_id: sub.user_id, pts: points[i] });
-    if (addPointsErr) {
-      console.error('add_points rpc failed:', addPointsErr);
-      const { data: prof, error: profErr } = await supabase
+      const { error: winnerError } = await supabase.from('winners').insert({
+        challenge_id: challengeId,
+        user_id: sub.user_id,
+        submission_id: sub.id,
+        placement,
+        prize_claimed: false,
+      });
+
+      if (winnerError && winnerError.code !== '23505') {
+        console.error('Winner insert error:', winnerError);
+        continue;
+      }
+
+      await supabase
+        .from('submissions')
+        .update({ is_winner: true, placement })
+        .eq('id', sub.id);
+
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('points')
+        .select('points, wins')
         .eq('id', sub.user_id)
         .single();
-      if (!profErr && prof) {
-        const { error: fbErr } = await supabase
-          .from('profiles')
-          .update({ points: (prof.points ?? 0) + points[i] })
-          .eq('id', sub.user_id);
-        if (fbErr) console.error('add_points fallback failed:', fbErr);
-      }
-    }
 
-    if (placement === 1) {
-      const { error: incWinsErr } = await supabase.rpc('increment_wins', { user_id: sub.user_id });
-      if (incWinsErr) {
-        console.error('increment_wins rpc failed:', incWinsErr);
-        const { data: prof, error: profErr } = await supabase
-          .from('profiles')
-          .select('wins')
-          .eq('id', sub.user_id)
-          .single();
-        if (!profErr && prof) {
-          const { error: fbErr } = await supabase
-            .from('profiles')
-            .update({ wins: (prof.wins ?? 0) + 1 })
-            .eq('id', sub.user_id);
-          if (fbErr) console.error('increment_wins fallback failed:', fbErr);
+      if (profile) {
+        const updateData: { points: number; wins?: number } = {
+          points: (profile.points ?? 0) + points[i],
+        };
+        if (placement === 1) {
+          updateData.wins = (profile.wins ?? 0) + 1;
         }
+        await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', sub.user_id);
       }
+
+      const placementText = placement === 1 ? '1st' : placement === 2 ? '2nd' : '3rd';
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: sub.user_id,
+          title: '🏆 You Won!',
+          message: `Congratulations! You won ${placementText} place in "${challenge.title}"! +${points[i]} points`,
+          type: 'winner',
+          is_read: false,
+        });
+
+      winners.push({ placement, userId: sub.user_id, submissionId: sub.id });
     }
 
-    // 4. Notify winner
-    await supabase.from('notifications').insert({
-      user_id: sub.user_id,
-      title: 'Congratulations!',
-      message: `You won ${placement}${placement === 1 ? 'st' : placement === 2 ? 'nd' : 'rd'} place in ${challenge.title}!`
-    });
-
-    if (winnerData) {
-      winnersToReturn.push(winnerData);
-    }
+    return { success: true, winners };
+  } catch (err: any) {
+    console.error('computeWinners error:', err);
+    return { error: err?.message ?? 'Failed to compute winners' };
   }
-
-  // Change phase to completed
-  await supabase.from('challenges').update({ phase: 'completed' }).eq('id', challengeId);
-
-  // Return formatted array
-  const { data: finalWinners } = await supabase
-    .from('winners')
-    .select('*, user:profiles(id, name, avatar_url, role)')
-    .eq('challenge_id', challengeId)
-    .order('placement', { ascending: true });
-
-  return (finalWinners ?? []) as (Winner & { user: Profile })[];
 }
