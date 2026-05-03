@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container } from '@/layout/Container';
 import { Section } from '@/layout/Section';
@@ -7,35 +7,62 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
-import { MOCK_CHALLENGES, MOCK_SUBMISSIONS, MOCK_WINNERS } from '@/lib/mock/data';
-import { getStorage } from '@/lib/storage';
-import type { Challenge, WinnerRecord } from '@/types';
+import { getCompletedChallengesWithWinners } from '@/lib/supabase/winners';
 import { Heart } from 'lucide-react';
+
+type ListChallenge = {
+  id: string;
+  title: string;
+  category: string;
+  coverImage: string;
+  prizeType: string | null;
+  hasWinners: boolean;
+  topWinnerName: string;
+  topWinnerAvatar: string | null | undefined;
+  topWinnerVotes: number;
+};
 
 export function WinnersPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'prize'>('all');
   const [search, setSearch] = useState('');
+  const [challenges, setChallenges] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const allChallenges: Challenge[] = [...MOCK_CHALLENGES, ...getStorage<Challenge[]>('challenges', [])];
-  const allWinners: WinnerRecord[] = [...MOCK_WINNERS, ...getStorage<WinnerRecord[]>('winners', [])];
-  const completed = allChallenges.filter(c => c.status === 'ended' || c.phase === 'completed');
+  useEffect(() => {
+    const fetchWinners = async () => {
+      setLoading(true);
+      try {
+        const data = await getCompletedChallengesWithWinners();
+        setChallenges(data);
+      } catch (err) {
+        console.error('Winners fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWinners();
+  }, []);
 
-  const winnerMap = new Map<string, WinnerRecord>();
-  allWinners.forEach(w => winnerMap.set(w.challengeId, w));
+  const listItems: ListChallenge[] = challenges.map((challenge) => ({
+    id: challenge.id,
+    title: challenge.title,
+    category: challenge.category ?? '',
+    coverImage:
+      challenge.cover_image_url ||
+      'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600',
+    prizeType: challenge.prize_type ?? null,
+    hasWinners: challenge.winners.length > 0,
+    topWinnerName: challenge.topWinner?.profiles?.name ?? 'TBD',
+    topWinnerAvatar: challenge.topWinner?.profiles?.avatar_url,
+    topWinnerVotes: challenge.topWinner?.submissions?.votes_count ?? 0,
+  }));
 
-  const filtered = completed.filter(c => {
-    const prizeMatch = filter === 'all' || c.prizeType !== 'bragging';
+  const filtered = listItems.filter((c) => {
+    const prizeMatch = filter === 'all' || c.prizeType !== 'bragging_rights';
     const searchMatch = !search || c.title.toLowerCase().includes(search.toLowerCase());
     return prizeMatch && searchMatch;
   });
-
-  const getTopWinner = (challengeId: string) => {
-    const record = winnerMap.get(challengeId);
-    if (record) return record.winners[0];
-    const subs = MOCK_SUBMISSIONS.filter(s => s.challengeId === challengeId).sort((a, b) => b.votes - a.votes);
-    return subs[0] ? { name: subs[0].userName, avatar: subs[0].userAvatar, votes: subs[0].votes } : null;
-  };
 
   return (
     <Container><Section>
@@ -49,10 +76,18 @@ export function WinnersPage() {
         <Input placeholder="Search challenges..." value={search} onChange={e => setSearch(e.target.value)} />
         <Button variant="secondary" onClick={() => {}}>Search</Button>
       </div>
-      <p className="text-sm text-[#9CA3AF] mb-4">Completed Challenges ({filtered.length})</p>
+      <p className="text-sm text-[#9CA3AF] mb-4">
+        {loading ? 'Loading...' : `Completed Challenges (${filtered.length})`}
+      </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         {filtered.map(c => {
-          const top = getTopWinner(c.id);
+          const top = c.hasWinners
+            ? {
+                name: c.topWinnerName,
+                avatar: c.topWinnerAvatar,
+                votes: c.topWinnerVotes,
+              }
+            : null;
           return (
             <Card key={c.id} className="overflow-hidden p-0">
               <div className="relative">
@@ -61,13 +96,18 @@ export function WinnersPage() {
               </div>
               <div className="p-4">
                 <p className="font-semibold text-sm mb-2 line-clamp-1">{c.title}</p>
-                {top && (
+                {!c.hasWinners && (
+                  <div className="mb-2">
+                    <Badge variant="warning">Winners Pending</Badge>
+                  </div>
+                )}
+                {c.hasWinners && top && (
                   <div className="flex items-center gap-2 mb-2">
                     <img src={top.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=W'} alt="" className="w-6 h-6 rounded-full" />
                     <span className="text-xs font-medium">{top.name}</span>
                   </div>
                 )}
-                {top && (
+                {c.hasWinners && top && (
                   <div className="flex items-center gap-1 text-xs text-[#9CA3AF] mb-3">
                     <Heart size={12} /> {top.votes} votes
                   </div>
@@ -78,7 +118,7 @@ export function WinnersPage() {
           );
         })}
       </div>
-      {filtered.length === 0 && <p className="text-center text-[#9CA3AF] py-8">No completed challenges found</p>}
+      {!loading && filtered.length === 0 && <p className="text-center text-[#9CA3AF] py-8">No completed challenges found</p>}
     </Section></Container>
   );
 }

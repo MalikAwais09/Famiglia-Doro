@@ -1,69 +1,135 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Container } from '@/layout/Container';
 import { Section } from '@/layout/Section';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { MOCK_CHALLENGES, MOCK_SUBMISSIONS, MOCK_WINNERS } from '@/lib/mock/data';
-import { getStorage, setStorage } from '@/lib/storage';
-import type { Challenge, WinnerRecord } from '@/types';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { WinnerClaimAgreement } from '@/components/agreements/WinnerClaimAgreement';
 import { toast } from 'sonner';
-import { Share2, Trophy } from 'lucide-react';
+import { Share2, Trophy, Loader2 } from 'lucide-react';
+import { getChallengeWinnersDetail, claimPrize } from '@/lib/supabase/winners';
+import { useAuth } from '@/context/AuthContext';
+
+type SpotlightWinner = {
+  id: string;
+  userId: string;
+  name: string;
+  avatar: string;
+  position: number;
+  votes: number;
+  prizeAmount: number;
+  claimStatus: 'not_claimed' | 'pending' | 'paid';
+  verified: boolean;
+};
 
 export function WinnerSpotlight() {
   const { challengeId } = useParams();
-  const navigate = useNavigate();
-  const userId = localStorage.getItem('userId') || 'user_current';
+  const { profile } = useAuth();
+  const [detail, setDetail] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [claimOpen, setClaimOpen] = useState(false);
+  const [claimTargetId, setClaimTargetId] = useState<string | null>(null);
 
-  const allChallenges: Challenge[] = [...MOCK_CHALLENGES, ...getStorage<Challenge[]>('challenges', [])];
-  const challenge = allChallenges.find(c => c.id === challengeId);
+  const refreshDetail = useCallback(async () => {
+    if (!challengeId) return;
+    const data = await getChallengeWinnersDetail(challengeId);
+    setDetail(data);
+  }, [challengeId]);
 
-  const allWinners: WinnerRecord[] = [...MOCK_WINNERS, ...getStorage<WinnerRecord[]>('winners', [])];
-  let winnerRecord = allWinners.find(w => w.challengeId === challengeId);
-
-  if (!winnerRecord && challengeId) {
-    const subs = MOCK_SUBMISSIONS.filter(s => s.challengeId === challengeId).sort((a, b) => b.votes - a.votes);
-    if (subs.length >= 3) {
-      winnerRecord = {
-        challengeId: challengeId,
-        challengeTitle: challenge?.title || 'Challenge',
-        announcedAt: new Date().toISOString(),
-        winners: subs.slice(0, 3).map((s, i) => ({
-          userId: s.userId,
-          name: s.userName,
-          avatar: s.userAvatar,
-          position: i + 1,
-          votes: s.votes,
-          prizeAmount: Math.floor((challenge?.entryFee || 0) * (challenge?.currentParticipants || 0) * (i === 0 ? 0.5 : i === 1 ? 0.3 : 0.2)),
-          claimStatus: 'not_claimed' as const,
-          verified: false,
-        })),
-      };
+  useEffect(() => {
+    if (!challengeId) {
+      setLoading(false);
+      return;
     }
-  }
+    let cancelled = false;
+    setLoading(true);
+    getChallengeWinnersDetail(challengeId).then((data) => {
+      if (!cancelled) {
+        setDetail(data);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeId]);
 
-  if (!challenge || !winnerRecord) return <Container><Section><p className="text-center text-[#9CA3AF] py-8">Challenge or winners not found</p></Section></Container>;
-
-  const topWinner = winnerRecord.winners[0];
-  const isTopWinner = userId === topWinner.userId;
-
-  const handleClaim = () => {
-    const winners = getStorage<WinnerRecord[]>('winners', allWinners.filter(w => w.challengeId !== challengeId));
-    const updated = { ...winnerRecord!, winners: winnerRecord!.winners.map(w => w.position === 1 ? { ...w, claimStatus: 'pending' as const } : w) };
-    winners.push(updated);
-    setStorage('winners', winners);
-    toast.success('Claim submitted. Pending verification.');
-    setClaimOpen(false);
+  const mapWinner = (w: any, row: typeof detail): SpotlightWinner => {
+    const pool = (row?.entry_fee ?? 0) * (row?.current_participants ?? 0);
+    const cut = w.placement === 1 ? 0.5 : w.placement === 2 ? 0.3 : 0.2;
+    return {
+      id: w.id,
+      userId: w.user_id,
+      name: w.profiles?.name ?? 'Unknown',
+      avatar: w.profiles?.avatar_url ?? '',
+      position: w.placement,
+      votes: w.submissions?.votes_count ?? 0,
+      prizeAmount: Math.floor(pool * cut),
+      claimStatus: w.prize_claimed ? 'paid' : 'not_claimed',
+      verified: !!w.prize_claimed,
+    };
   };
 
+  const handleClaimPrize = async (winnerId: string) => {
+    const result = await claimPrize(winnerId);
+    if ('error' in result) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success('Prize claimed!');
+    await refreshDetail();
+    setClaimOpen(false);
+    setClaimTargetId(null);
+  };
+
+  const isMyWinning = (w: SpotlightWinner) =>
+    !!profile?.id && profile.id === w.userId && w.claimStatus === 'not_claimed';
+
+  if (loading) {
+    return (
+      <Container>
+        <Section>
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="animate-spin text-yellow-500" size={32} />
+          </div>
+        </Section>
+      </Container>
+    );
+  }
+
+  if (!detail || !detail.winners?.length) {
+    return (
+      <Container>
+        <Section>
+          <p className="text-center text-[#9CA3AF] py-8">Challenge or winners not found</p>
+        </Section>
+      </Container>
+    );
+  }
+
+  const challenge = {
+    coverImage:
+      detail.cover_image_url ||
+      'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600',
+    title: detail.title,
+    category: detail.category ?? '',
+    entryFee: detail.entry_fee ?? 0,
+    currentParticipants: detail.current_participants ?? 0,
+  };
+
+  const winnersMapped = detail.winners.map((w: any) => mapWinner(w, detail));
+  const winnerRecord = {
+    challengeId: detail.id,
+    challengeTitle: detail.title,
+    announcedAt: '',
+    winners: winnersMapped,
+  };
+
+  const topWinner = winnerRecord.winners[0];
+  const isTopWinner = !!profile?.id && profile.id === topWinner.userId;
+
   const handleFinalize = () => {
-    const winners = getStorage<WinnerRecord[]>('winners', allWinners.filter(w => w.challengeId !== challengeId));
-    const updated = { ...winnerRecord!, winners: winnerRecord!.winners.map(w => w.position === 1 ? { ...w, claimStatus: 'paid' as const, verified: true } : w) };
-    winners.push(updated);
-    setStorage('winners', winners);
     toast.success('Claim verified. Payout completed.');
   };
 
@@ -95,7 +161,16 @@ export function WinnerSpotlight() {
                   </div>
                 </div>
                 <div>
-                  {isTopWinner && topWinner.claimStatus === 'not_claimed' && <Button onClick={() => setClaimOpen(true)}>Claim Prize</Button>}
+                  {isMyWinning(topWinner) && (
+                    <Button
+                      onClick={() => {
+                        setClaimTargetId(topWinner.id);
+                        setClaimOpen(true);
+                      }}
+                    >
+                      Claim Prize
+                    </Button>
+                  )}
                   {isTopWinner && topWinner.claimStatus === 'pending' && (
                     <div className="space-y-2">
                       <Badge variant="warning">Pending Verification</Badge>
@@ -111,8 +186,8 @@ export function WinnerSpotlight() {
 
           <h2 className="text-lg font-semibold">Other Winners</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {winnerRecord.winners.slice(1).map(w => (
-              <Card key={w.position}>
+            {winnerRecord.winners.slice(1).map((w: SpotlightWinner) => (
+              <Card key={w.id}>
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${w.position === 2 ? 'bg-gray-400 text-black' : 'bg-amber-700 text-white'}`}>
                     {w.position}
@@ -124,6 +199,17 @@ export function WinnerSpotlight() {
                       <span className="text-sm font-bold text-emerald-400">${w.prizeAmount}</span>
                     </div>
                   </div>
+                  {isMyWinning(w) && (
+                    <Button
+                      className="shrink-0 text-xs px-2 py-1 h-auto"
+                      onClick={() => {
+                        setClaimTargetId(w.id);
+                        setClaimOpen(true);
+                      }}
+                    >
+                      Claim Prize
+                    </Button>
+                  )}
                   <Badge variant={w.claimStatus === 'paid' ? 'success' : w.claimStatus === 'pending' ? 'warning' : 'default'}>
                     {w.claimStatus}
                   </Badge>
@@ -150,7 +236,16 @@ export function WinnerSpotlight() {
         </div>
       </div>
 
-      <WinnerClaimAgreement isOpen={claimOpen} onCancel={() => setClaimOpen(false)} onConfirm={handleClaim} />
+      <WinnerClaimAgreement
+        isOpen={claimOpen}
+        onCancel={() => {
+          setClaimOpen(false);
+          setClaimTargetId(null);
+        }}
+        onConfirm={() => {
+          if (claimTargetId) void handleClaimPrize(claimTargetId);
+        }}
+      />
     </Section></Container>
   );
 }
