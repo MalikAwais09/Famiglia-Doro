@@ -519,12 +519,14 @@ export function ChallengeDetail() {
               </div>
             </Card>
 
-            {phase === 'completed' && (
+            {phase === 'completed' && challenge?.id && (
               <Card>
                 <WinnersDisplay
                   challengeId={challenge.id}
-                  isCurrentUserWinner={isCurrentUserWinner}
                   currentUserId={profile?.id}
+                  challengeTitle={challenge.title}
+                  prizeDescription={challenge.prize_description}
+                  prizeType={challenge.prize_type}
                 />
               </Card>
             )}
