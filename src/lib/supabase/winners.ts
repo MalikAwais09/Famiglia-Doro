@@ -2,89 +2,105 @@ import { supabase } from './client';
 
 export interface CalculatedPrizeBreakdown {
   first: number | string;
-  second: number | string;
-  third: number | string;
+  second: number | string | null;
+  third: number | string | null;
   currency: string;
   type: string;
+  total: number;
+  winnersCount: number;
 }
 
-export function calculatePrizes(challenge: {
-  prize_type?: string | null;
-  prize_description?: string | null;
-  entry_fee?: number | null;
-  current_participants?: number | null;
-}): CalculatedPrizeBreakdown {
+export function calculatePrizes(challenge: any): CalculatedPrizeBreakdown {
   const {
     prize_type,
     prize_description,
     entry_fee,
     current_participants,
+    scoring_system,
   } = challenge;
 
-  const totalPool = (Number(entry_fee) || 0) * (Number(current_participants) || 0);
-  const platformCut = totalPool * 0.15;
-  const availablePool = totalPool - platformCut;
+  const parsedAmount = parseFloat(
+    (prize_description ?? '0').replace(/[^0-9.]/g, '')
+  );
+
+  const getTotalPrize = () => {
+    if (parsedAmount > 0) return parsedAmount;
+    const pool = (entry_fee ?? 0) * (current_participants ?? 0);
+    return Math.round(pool * 0.85);
+  };
+
+  const isOneRounder = scoring_system === '1_rounder';
 
   if (prize_type === 'cash') {
-    const descAmount = parseFloat(
-      (prize_description ?? '0').replace(/[^0-9.]/g, '')
-    );
+    const total = getTotalPrize();
 
-    if (descAmount > 0) {
+    if (isOneRounder) {
       return {
-        first: descAmount,
-        second: Math.round(descAmount * 0.6),
-        third: Math.round(descAmount * 0.3),
+        first: total,
+        second: 0,
+        third: 0,
+        total,
         currency: '$',
         type: 'cash',
+        winnersCount: 1,
       };
     }
 
     return {
-      first: Math.round(availablePool * 0.6),
-      second: Math.round(availablePool * 0.25),
-      third: Math.round(availablePool * 0.15),
+      first: Math.round(total * 0.6),
+      second: Math.round(total * 0.25),
+      third: Math.round(total * 0.15),
+      total,
       currency: '$',
       type: 'cash',
-    };
-  }
-
-  if (prize_type === 'digital') {
-    return {
-      first: prize_description ?? 'Digital Prize',
-      second: prize_description ?? 'Digital Prize',
-      third: prize_description ?? 'Digital Prize',
-      currency: '',
-      type: 'digital',
-    };
-  }
-
-  if (prize_type === 'physical') {
-    return {
-      first: prize_description ?? 'Physical Prize',
-      second: prize_description ?? 'Physical Prize',
-      third: prize_description ?? 'Physical Prize',
-      currency: '',
-      type: 'physical',
+      winnersCount: 3,
     };
   }
 
   if (prize_type === 'bragging_rights') {
     return {
       first: '🏆 Champion',
-      second: '🥈 Runner Up',
-      third: '🥉 Third Place',
+      second: isOneRounder ? null : '🥈 Runner Up',
+      third: isOneRounder ? null : '🥉 Third Place',
+      total: 0,
       currency: '',
       type: 'bragging_rights',
+      winnersCount: isOneRounder ? 1 : 3,
+    };
+  }
+
+  if (prize_type === 'digital') {
+    return {
+      first: prize_description ?? 'Digital Prize',
+      second: isOneRounder ? null : prize_description ?? 'Digital Prize',
+      third: isOneRounder ? null : prize_description ?? 'Digital Prize',
+      total: 0,
+      currency: '',
+      type: 'digital',
+      winnersCount: isOneRounder ? 1 : 3,
+    };
+  }
+
+  if (prize_type === 'physical') {
+    return {
+      first: prize_description ?? 'Physical Prize',
+      second: isOneRounder ? null : prize_description ?? 'Physical Prize',
+      third: isOneRounder ? null : prize_description ?? 'Physical Prize',
+      total: 0,
+      currency: '',
+      type: 'physical',
+      winnersCount: isOneRounder ? 1 : 3,
     };
   }
 
   return {
     first: prize_description ?? 'Prize TBD',
-    second: prize_description ?? 'Prize TBD',
-    third: prize_description ?? 'Prize TBD',
+    second: isOneRounder ? null : prize_description ?? 'Prize TBD',
+    third: isOneRounder ? null : prize_description ?? 'Prize TBD',
+    total: 0,
     currency: '',
-    type: prize_type ?? 'none',
+    type: 'none',
+    winnersCount: isOneRounder ? 1 : 3,
   };
 }
 
@@ -101,6 +117,7 @@ export async function getCompletedChallengesWithWinners() {
       prize_description,
       entry_fee,
       current_participants,
+      scoring_system,
       phase,
       end_date,
       profiles!challenges_created_by_fkey (
@@ -161,6 +178,7 @@ export async function getChallengeWinnersDetail(challengeId: string) {
       prize_description,
       entry_fee,
       current_participants,
+      scoring_system,
       phase,
       profiles!challenges_created_by_fkey (
         id, name, avatar_url

@@ -1,7 +1,6 @@
 import { supabase } from './client';
 import { getLocalCalendarDateString } from '@/lib/utils/dateUtils';
 import { computePhase } from '@/lib/supabase/challenges';
-import type { Vote, Winner, Profile } from './types';
 
 // ── castVote ──────────────────────────────────────────────────────────────
 export async function castVote(submissionId: string, isPaid: boolean): Promise<{ success: boolean; newVoteCount: number; isPaid: boolean; dorocoinsSpent: number }> {
@@ -173,13 +172,15 @@ export async function computeWinners(
 
     const { data: challenge, error: challengeError } = await supabase
       .from('challenges')
-      .select('id, title, phase, created_by')
+      .select('id, title, phase, created_by, scoring_system')
       .eq('id', challengeId)
       .single();
 
     if (challengeError) return { error: challengeError.message };
     if (!challenge) return { error: 'Challenge not found' };
-    if (challenge.created_by !== currentUserId) return { error: 'Only the creator can compute winners' };
+    if (challenge.created_by !== currentUserId) {
+      return { error: 'Only creator can announce winners' };
+    }
 
     const { data: existingWinners, error: existingError } = await supabase
       .from('winners')
@@ -194,19 +195,21 @@ export async function computeWinners(
       .from('submissions')
       .select('id, user_id, votes_count, title')
       .eq('challenge_id', challengeId)
-      .order('votes_count', { ascending: false })
-      .limit(3);
+      .order('votes_count', { ascending: false });
 
     if (subError) return { error: subError.message };
     if (!submissions || submissions.length === 0) {
       return { error: 'No submissions found' };
     }
 
+    const winnerCount = challenge.scoring_system === '1_rounder' ? 1 : 3;
+    const winnerSubmissions = submissions.slice(0, winnerCount);
+
     const points = [100, 50, 25];
     const winners: Array<{ placement: number; userId: string; submissionId: string }> = [];
 
-    for (let i = 0; i < submissions.length; i++) {
-      const sub = submissions[i];
+    for (let i = 0; i < winnerSubmissions.length; i++) {
+      const sub = winnerSubmissions[i];
       const placement = i + 1;
 
       const { error: winnerError } = await supabase.from('winners').insert({
