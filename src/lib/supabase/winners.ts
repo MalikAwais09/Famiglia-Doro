@@ -1,5 +1,93 @@
 import { supabase } from './client';
 
+export interface CalculatedPrizeBreakdown {
+  first: number | string;
+  second: number | string;
+  third: number | string;
+  currency: string;
+  type: string;
+}
+
+export function calculatePrizes(challenge: {
+  prize_type?: string | null;
+  prize_description?: string | null;
+  entry_fee?: number | null;
+  current_participants?: number | null;
+}): CalculatedPrizeBreakdown {
+  const {
+    prize_type,
+    prize_description,
+    entry_fee,
+    current_participants,
+  } = challenge;
+
+  const totalPool = (Number(entry_fee) || 0) * (Number(current_participants) || 0);
+  const platformCut = totalPool * 0.15;
+  const availablePool = totalPool - platformCut;
+
+  if (prize_type === 'cash') {
+    const descAmount = parseFloat(
+      (prize_description ?? '0').replace(/[^0-9.]/g, '')
+    );
+
+    if (descAmount > 0) {
+      return {
+        first: descAmount,
+        second: Math.round(descAmount * 0.6),
+        third: Math.round(descAmount * 0.3),
+        currency: '$',
+        type: 'cash',
+      };
+    }
+
+    return {
+      first: Math.round(availablePool * 0.6),
+      second: Math.round(availablePool * 0.25),
+      third: Math.round(availablePool * 0.15),
+      currency: '$',
+      type: 'cash',
+    };
+  }
+
+  if (prize_type === 'digital') {
+    return {
+      first: prize_description ?? 'Digital Prize',
+      second: prize_description ?? 'Digital Prize',
+      third: prize_description ?? 'Digital Prize',
+      currency: '',
+      type: 'digital',
+    };
+  }
+
+  if (prize_type === 'physical') {
+    return {
+      first: prize_description ?? 'Physical Prize',
+      second: prize_description ?? 'Physical Prize',
+      third: prize_description ?? 'Physical Prize',
+      currency: '',
+      type: 'physical',
+    };
+  }
+
+  if (prize_type === 'bragging_rights') {
+    return {
+      first: '🏆 Champion',
+      second: '🥈 Runner Up',
+      third: '🥉 Third Place',
+      currency: '',
+      type: 'bragging_rights',
+    };
+  }
+
+  return {
+    first: prize_description ?? 'Prize TBD',
+    second: prize_description ?? 'Prize TBD',
+    third: prize_description ?? 'Prize TBD',
+    currency: '',
+    type: prize_type ?? 'none',
+  };
+}
+
 // Get all completed challenges with their winners
 export async function getCompletedChallengesWithWinners() {
   const { data: challenges, error } = await supabase

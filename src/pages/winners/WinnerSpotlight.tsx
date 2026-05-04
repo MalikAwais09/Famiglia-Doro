@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { WinnerClaimAgreement } from '@/components/agreements/WinnerClaimAgreement';
 import { toast } from 'sonner';
 import { Share2, Trophy, Loader2 } from 'lucide-react';
-import { getChallengeWinnersDetail, claimPrize } from '@/lib/supabase/winners';
+import { getChallengeWinnersDetail, claimPrize, calculatePrizes } from '@/lib/supabase/winners';
 import { useAuth } from '@/context/AuthContext';
 
 type SpotlightWinner = {
@@ -18,7 +18,7 @@ type SpotlightWinner = {
   avatar: string;
   position: number;
   votes: number;
-  prizeAmount: number;
+  prizeDisplayText: string;
   claimStatus: 'not_claimed' | 'pending' | 'paid';
   verified: boolean;
 };
@@ -56,8 +56,11 @@ export function WinnerSpotlight() {
   }, [challengeId]);
 
   const mapWinner = (w: any, row: typeof detail): SpotlightWinner => {
-    const pool = (row?.entry_fee ?? 0) * (row?.current_participants ?? 0);
-    const cut = w.placement === 1 ? 0.5 : w.placement === 2 ? 0.3 : 0.2;
+    const prizes = calculatePrizes(row ?? {});
+    const raw =
+      w.placement === 1 ? prizes.first : w.placement === 2 ? prizes.second : prizes.third;
+    const prizeDisplayText =
+      prizes.type === 'cash' ? `${prizes.currency}${raw}` : String(raw);
     return {
       id: w.id,
       userId: w.user_id,
@@ -65,7 +68,7 @@ export function WinnerSpotlight() {
       avatar: w.profiles?.avatar_url ?? '',
       position: w.placement,
       votes: w.submissions?.votes_count ?? 0,
-      prizeAmount: Math.floor(pool * cut),
+      prizeDisplayText,
       claimStatus: w.prize_claimed ? 'paid' : 'not_claimed',
       verified: !!w.prize_claimed,
     };
@@ -157,7 +160,7 @@ export function WinnerSpotlight() {
                   </div>
                   <div className="flex items-center gap-3 mt-1">
                     <Badge variant="gold">{topWinner.votes} votes</Badge>
-                    <span className="text-xl font-bold text-emerald-400">${topWinner.prizeAmount}</span>
+                    <span className="text-xl font-bold text-emerald-400">{topWinner.prizeDisplayText}</span>
                   </div>
                 </div>
                 <div>
@@ -196,7 +199,7 @@ export function WinnerSpotlight() {
                     <p className="font-medium text-sm">{w.name}</p>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-[#9CA3AF]">{w.votes} votes</span>
-                      <span className="text-sm font-bold text-emerald-400">${w.prizeAmount}</span>
+                      <span className="text-sm font-bold text-emerald-400">{w.prizeDisplayText}</span>
                     </div>
                   </div>
                   {isMyWinning(w) && (

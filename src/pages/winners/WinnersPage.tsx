@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
-import { getCompletedChallengesWithWinners } from '@/lib/supabase/winners';
+import { getCompletedChallengesWithWinners, calculatePrizes } from '@/lib/supabase/winners';
 import { Heart } from 'lucide-react';
 
 type ListChallenge = {
@@ -20,6 +20,7 @@ type ListChallenge = {
   topWinnerName: string;
   topWinnerAvatar: string | null | undefined;
   topWinnerVotes: number;
+  firstPrizeDisplay: string;
 };
 
 export function WinnersPage() {
@@ -44,19 +45,25 @@ export function WinnersPage() {
     fetchWinners();
   }, []);
 
-  const listItems: ListChallenge[] = challenges.map((challenge) => ({
-    id: challenge.id,
-    title: challenge.title,
-    category: challenge.category ?? '',
-    coverImage:
-      challenge.cover_image_url ||
-      'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600',
-    prizeType: challenge.prize_type ?? null,
-    hasWinners: challenge.winners.length > 0,
-    topWinnerName: challenge.topWinner?.profiles?.name ?? 'TBD',
-    topWinnerAvatar: challenge.topWinner?.profiles?.avatar_url,
-    topWinnerVotes: challenge.topWinner?.submissions?.votes_count ?? 0,
-  }));
+  const listItems: ListChallenge[] = challenges.map((challenge) => {
+    const prizes = calculatePrizes(challenge);
+    const firstPrizeDisplay =
+      prizes.type === 'cash' ? `${prizes.currency}${prizes.first}` : String(prizes.first);
+    return {
+      id: challenge.id,
+      title: challenge.title,
+      category: challenge.category ?? '',
+      coverImage:
+        challenge.cover_image_url ||
+        'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600',
+      prizeType: challenge.prize_type ?? null,
+      hasWinners: challenge.winners.length > 0,
+      topWinnerName: challenge.topWinner?.profiles?.name ?? 'TBD',
+      topWinnerAvatar: challenge.topWinner?.profiles?.avatar_url,
+      topWinnerVotes: challenge.topWinner?.submissions?.votes_count ?? 0,
+      firstPrizeDisplay,
+    };
+  });
 
   const filtered = listItems.filter((c) => {
     const prizeMatch = filter === 'all' || c.prizeType !== 'bragging_rights';
@@ -111,6 +118,9 @@ export function WinnersPage() {
                   <div className="flex items-center gap-1 text-xs text-[#9CA3AF] mb-3">
                     <Heart size={12} /> {top.votes} votes
                   </div>
+                )}
+                {c.hasWinners && top && (
+                  <p className="text-xs font-semibold text-emerald-400 mb-3">1st: {c.firstPrizeDisplay}</p>
                 )}
                 <Button fullWidth onClick={() => navigate(`/winners/${c.id}`)}>View</Button>
               </div>
