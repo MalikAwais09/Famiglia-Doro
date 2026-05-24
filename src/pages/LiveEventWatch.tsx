@@ -104,12 +104,17 @@ export function LiveEventWatch() {
           }}
         />
         <div className="max-w-4xl mx-auto">
-          {event.created_by === session?.user?.id || hasJoined ? (
+          {event.status === 'ended' ? (
+            <div className="aspect-video bg-[#161618] rounded-lg flex flex-col items-center justify-center mb-6 border border-[rgba(255,255,255,0.08)]">
+               <p className="text-[#9CA3AF] text-lg font-semibold mb-2">This live event has ended.</p>
+               <p className="text-sm text-[#6B7280]">Thank you for tuning in!</p>
+            </div>
+          ) : event.created_by === session?.user?.id || hasJoined ? (
             <div className="mb-6">
               <LiveRoom roomId={event.id} isHost={event.created_by === session?.user?.id} />
             </div>
           ) : (
-            <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6">
+            <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6 border border-[rgba(255,255,255,0.08)]">
               {videoSrc ? (
                 <iframe
                   src={videoSrc}
@@ -121,7 +126,7 @@ export function LiveEventWatch() {
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-sm text-[#6B7280]">
                   <p className="mb-4">{event.status === 'live' ? 'Stream is live. Join to watch!' : 'Stream opens when the event is live'}</p>
-                  <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
+                  <Button variant="primary" onClick={() => setLiveAgreementOpen(true)} disabled={event.status !== 'live'}>
                     Join Live Event
                   </Button>
                 </div>
