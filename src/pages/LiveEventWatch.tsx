@@ -139,9 +139,11 @@ export function LiveEventWatch() {
               <p className="text-xs text-[#6B7280] mt-2">Hosted by {hostName}</p>
             </div>
             <div className="flex gap-2 shrink-0">
-              <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
-                Join Live Event
-              </Button>
+              {!(event.created_by === session?.user?.id || hasJoined) && (
+                <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
+                  Join Live Event
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -151,9 +153,11 @@ export function LiveEventWatch() {
               >
                 <Share2 size={14} />
               </Button>
-              <Button variant={hasReminder ? 'secondary' : 'primary'} onClick={handleReminder} disabled={hasReminder}>
-                <Bell size={14} /> {hasReminder ? 'Reminder Set' : 'Set Reminder'}
-              </Button>
+              {!(event.created_by === session?.user?.id || hasJoined) && (
+                <Button variant={hasReminder ? 'secondary' : 'primary'} onClick={handleReminder} disabled={hasReminder}>
+                  <Bell size={14} /> {hasReminder ? 'Reminder Set' : 'Set Reminder'}
+                </Button>
+              )}
             </div>
           </div>
         </div>
