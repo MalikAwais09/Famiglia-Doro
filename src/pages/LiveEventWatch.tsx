@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Container } from '@/layout/Container';
 import { Section } from '@/layout/Section';
 import { Badge } from '@/components/ui/Badge';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { getLiveEventById, subscribeToLiveEvent } from '@/lib/supabase/liveEvents';
 import type { LiveEventWithCreator } from '@/lib/supabase/liveEvents';
 import { getStorage } from '@/lib/storage';
-import { Bell, Share2 } from 'lucide-react';
+import { Bell, Share2, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
@@ -16,9 +16,11 @@ import { LiveRoom } from '@/pages/live/LiveRoom';
 
 export function LiveEventWatch() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { session } = useAuth();
   const [event, setEvent] = useState<LiveEventWithCreator | null | undefined>(undefined);
   const [hasJoined, setHasJoined] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [hasReminder, setHasReminder] = useState(() => {
     const r = getStorage<Record<string, string>>('reminders', {});
     return !!r[id || ''];
@@ -53,6 +55,25 @@ export function LiveEventWatch() {
       supabase.removeChannel(channel);
     };
   }, [id, load]);
+
+  const handleDelete = async () => {
+    if (!event) return;
+    const confirmDelete = window.confirm('Are you sure you want to permanently delete this live event?');
+    if (!confirmDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('live_events').delete().eq('id', event.id);
+      if (error) throw error;
+      toast.success('Live event deleted successfully');
+      navigate('/live-events');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Failed to delete live event. (Did you add the DB policy?)');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (event === undefined) {
     return (
@@ -91,6 +112,8 @@ export function LiveEventWatch() {
     window.open(calUrl, '_blank');
   };
 
+  const isCreator = event.created_by === session?.user?.id;
+
   return (
     <Container>
       <Section>
@@ -109,9 +132,9 @@ export function LiveEventWatch() {
                <p className="text-[#9CA3AF] text-lg font-semibold mb-2">This live event has ended.</p>
                <p className="text-sm text-[#6B7280]">Thank you for tuning in!</p>
             </div>
-          ) : event.created_by === session?.user?.id || hasJoined ? (
+          ) : isCreator || hasJoined ? (
             <div className="mb-6">
-              <LiveRoom roomId={event.id} isHost={event.created_by === session?.user?.id} />
+              <LiveRoom roomId={event.id} isHost={isCreator} />
             </div>
           ) : (
             <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6 border border-[rgba(255,255,255,0.08)]">
@@ -144,7 +167,17 @@ export function LiveEventWatch() {
               <p className="text-xs text-[#6B7280] mt-2">Hosted by {hostName}</p>
             </div>
             <div className="flex gap-2 shrink-0">
-              {!(event.created_by === session?.user?.id || hasJoined) && (
+              {isCreator && (
+                <Button 
+                  variant="error" 
+                  onClick={handleDelete} 
+                  loading={isDeleting}
+                  disabled={isDeleting}
+                >
+                  <Trash2 size={14} className="mr-1" /> Delete Event
+                </Button>
+              )}
+              {!(isCreator || hasJoined) && (
                 <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
                   Join Live Event
                 </Button>
@@ -158,7 +191,7 @@ export function LiveEventWatch() {
               >
                 <Share2 size={14} />
               </Button>
-              {!(event.created_by === session?.user?.id || hasJoined) && (
+              {!(isCreator || hasJoined) && (
                 <Button variant={hasReminder ? 'secondary' : 'primary'} onClick={handleReminder} disabled={hasReminder}>
                   <Bell size={14} /> {hasReminder ? 'Reminder Set' : 'Set Reminder'}
                 </Button>
