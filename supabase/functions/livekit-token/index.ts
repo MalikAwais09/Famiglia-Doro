@@ -98,7 +98,8 @@ serve(async (req) => {
       canSubscribe: true,
     });
 
-    return new Response(JSON.stringify({ token: at.toJwt() }), {
+    const jwt = await at.toJwt();
+    return new Response(JSON.stringify({ token: jwt }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
