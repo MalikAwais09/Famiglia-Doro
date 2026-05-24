@@ -29,7 +29,7 @@ function CustomLeaveButton({ isHost, roomId }: { isHost: boolean; roomId: string
       try {
         await supabase
           .from('live_events')
-          .update({ status: 'ended', ended_at: new Date().toISOString() })
+          .update({ status: 'ended' })
           .eq('id', roomId);
         
         // Broadcast instant end signal to all participants
