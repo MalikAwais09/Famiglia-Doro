@@ -32,6 +32,13 @@ function CustomLeaveButton({ isHost, roomId }: { isHost: boolean; roomId: string
           .update({ status: 'ended', ended_at: new Date().toISOString() })
           .eq('id', roomId);
         
+        // Broadcast instant end signal to all participants
+        await supabase.channel(`live_room_control:${roomId}`).send({
+          type: 'broadcast',
+          event: 'room_ended',
+          payload: {}
+        });
+        
         room.disconnect();
         toast.success('Live event ended');
         navigate('/live-events');
@@ -63,8 +70,27 @@ export function LiveRoom({ roomId, isHost }: LiveRoomProps) {
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { session } = useAuth();
+  const navigate = useNavigate();
   
   const serverUrl = import.meta.env.VITE_LIVEKIT_URL;
+
+  // Listen for host ending the room instantly
+  useEffect(() => {
+    const channel = supabase.channel(`live_room_control:${roomId}`);
+    
+    channel
+      .on('broadcast', { event: 'room_ended' }, () => {
+        if (!isHost) {
+          toast('The host has ended the live event.', { icon: '👋' });
+          navigate('/live-events');
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, isHost, navigate]);
 
   useEffect(() => {
     if (!session) return;
