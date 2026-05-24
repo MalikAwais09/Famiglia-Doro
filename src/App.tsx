@@ -34,6 +34,7 @@ const ClaimPrize = lazy(() => import('@/pages/challenges/ClaimPrize').then(m => 
 const MyEntries = lazy(() => import('@/pages/MyEntries').then(m => ({ default: m.MyEntries })));
 const LiveEvents = lazy(() => import('@/pages/LiveEvents').then(m => ({ default: m.LiveEvents })));
 const LiveEventWatch = lazy(() => import('@/pages/LiveEventWatch').then(m => ({ default: m.LiveEventWatch })));
+const CreateLiveEvent = lazy(() => import('@/pages/live/CreateLiveEvent').then(m => ({ default: m.CreateLiveEvent })));
 const Leaderboards = lazy(() => import('@/pages/Leaderboards').then(m => ({ default: m.Leaderboards })));
 const Tournaments = lazy(() => import('@/pages/Tournaments').then(m => ({ default: m.Tournaments })));
 const WinnersPage = lazy(() => import('@/pages/winners/WinnersPage').then(m => ({ default: m.WinnersPage })));
@@ -96,6 +97,7 @@ export default function App() {
                       <Route path="/challenges/:id/claim-prize" element={<ProtectedRoute><ClaimPrize /></ProtectedRoute>} />
                       <Route path="/my-entries" element={<ProtectedRoute><MyEntries /></ProtectedRoute>} />
                       <Route path="/live-events" element={<ProtectedRoute><LiveEvents /></ProtectedRoute>} />
+                      <Route path="/live-events/create" element={<ProtectedRoute><CreateLiveEvent /></ProtectedRoute>} />
                       <Route path="/live-events/:id/watch" element={<ProtectedRoute><LiveEventWatch /></ProtectedRoute>} />
                       <Route path="/leaderboards" element={<ProtectedRoute><Leaderboards /></ProtectedRoute>} />
                       <Route path="/tournaments" element={<ProtectedRoute><Tournaments /></ProtectedRoute>} />

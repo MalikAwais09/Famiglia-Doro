@@ -85,7 +85,17 @@ export function LiveEvents() {
   return (
     <Container>
       <Section>
-        <PageHeader title="Live Events" subtitle="Watch live competitions and events" />
+        <PageHeader 
+          title="Live Events" 
+          subtitle="Watch live competitions and events" 
+          actions={
+            useRole().isCreator ? (
+              <Button onClick={() => navigate('/live-events/create')}>
+                Go Live
+              </Button>
+            ) : undefined
+          }
+        />
         {loading ? (
           <div className="flex justify-center py-16">
             <LoadingSpinner size="lg" message="Loading events…" />

@@ -11,10 +11,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
 import { LiveEventAgreement } from '@/components/agreements/LiveEventAgreement';
+import { useAuth } from '@/context/AuthContext';
+import { LiveRoom } from '@/pages/live/LiveRoom';
 
 export function LiveEventWatch() {
   const { id } = useParams();
+  const { session } = useAuth();
   const [event, setEvent] = useState<LiveEventWithCreator | null | undefined>(undefined);
+  const [hasJoined, setHasJoined] = useState(false);
   const [hasReminder, setHasReminder] = useState(() => {
     const r = getStorage<Record<string, string>>('reminders', {});
     return !!r[id || ''];
@@ -95,25 +99,35 @@ export function LiveEventWatch() {
           onCancel={() => setLiveAgreementOpen(false)}
           onConfirm={() => {
             setLiveAgreementOpen(false);
+            setHasJoined(true);
             toast.success(`You have joined "${event.title}"`);
           }}
         />
         <div className="max-w-4xl mx-auto">
-          <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6">
-            {videoSrc ? (
-              <iframe
-                src={videoSrc}
-                title={event.title}
-                className="w-full h-full"
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-sm text-[#6B7280]">
-                {event.status === 'live' ? 'Stream unavailable' : 'Stream opens when the event is live'}
-              </div>
-            )}
-          </div>
+          {event.created_by === session?.user?.id || hasJoined ? (
+            <div className="mb-6">
+              <LiveRoom roomId={event.id} isHost={event.created_by === session?.user?.id} />
+            </div>
+          ) : (
+            <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6">
+              {videoSrc ? (
+                <iframe
+                  src={videoSrc}
+                  title={event.title}
+                  className="w-full h-full"
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-sm text-[#6B7280]">
+                  <p className="mb-4">{event.status === 'live' ? 'Stream is live. Join to watch!' : 'Stream opens when the event is live'}</p>
+                  <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
+                    Join Live Event
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
