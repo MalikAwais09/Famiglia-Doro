@@ -26,7 +26,7 @@ export function CreateChallenge() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [form, setForm] = useState({
     title: '', category: 'Art & Design', customCategory: '', description: '',
-    eventType: 'group' as const, scoringSystem: 'bo3' as const,
+    eventType: 'group' as const, scoringSystem: 'single' as const,
     timeLimitEnabled: false, timeLimitHours: 1, timeLimitMinutes: 0,
     uploadTimeLimitEnabled: false, uploadTimeLimitMinutes: 5, uploadTimeLimitSeconds: 0,
     twoStepEnabled: false, entryRoundDuration: '', judgingMethod: 'community' as const,

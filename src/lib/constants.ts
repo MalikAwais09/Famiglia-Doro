@@ -20,9 +20,9 @@ export const CATEGORIES = [
 
 export const SCORING_SYSTEMS = [
   { value: 'single', label: '1 Rounder' },
-  { value: 'bo3', label: 'Best of 3' },
-  { value: 'bo5', label: 'Best of 5' },
-  { value: 'bo7', label: 'Best of 7' },
+  // { value: 'bo3', label: 'Best of 3' },
+  // { value: 'bo5', label: 'Best of 5' },
+  // { value: 'bo7', label: 'Best of 7' },
   { value: 'points', label: 'Points Based' },
 ] as const;
 
