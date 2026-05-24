@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LiveKitRoom, VideoConference, RoomAudioRenderer, ControlBar, useRoomContext } from '@livekit/components-react';
+import { LiveKitRoom, RoomAudioRenderer, ControlBar, useRoomContext, useTracks, VideoTrack } from '@livekit/components-react';
+import { Track } from 'livekit-client';
 import '@livekit/components-styles';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +13,39 @@ import { toast } from 'sonner';
 interface LiveRoomProps {
   roomId: string;
   isHost: boolean;
+}
+
+// Custom component to only render the host's video/screen
+function HostVideo() {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false }
+  );
+
+  // Find the screen share or camera track
+  const screenTrack = tracks.find((t) => t.source === Track.Source.ScreenShare);
+  const cameraTrack = tracks.find((t) => t.source === Track.Source.Camera);
+  const trackToDisplay = screenTrack || cameraTrack;
+
+  if (!trackToDisplay) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-black text-[#9CA3AF]">
+        Waiting for host video...
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative bg-black flex items-center justify-center overflow-hidden">
+      <VideoTrack 
+        trackRef={trackToDisplay} 
+        className="w-full h-full object-contain" 
+      />
+    </div>
+  );
 }
 
 // Custom button inside LiveKit context to disconnect
@@ -121,9 +155,9 @@ export function LiveRoom({ roomId, isHost }: LiveRoomProps) {
   }
 
   return (
-    <div className="relative w-full h-[80vh] bg-black rounded-xl overflow-hidden shadow-2xl flex border border-[rgba(255,255,255,0.1)]">
-      {/* Video Area (Left) */}
-      <div className="flex-1 relative">
+    <div className="relative w-full h-[85vh] md:h-[80vh] flex flex-col md:flex-row bg-black md:rounded-xl overflow-hidden shadow-2xl border border-[rgba(255,255,255,0.1)]">
+      {/* Video Area */}
+      <div className="flex-1 relative min-h-[40vh] md:min-h-0 bg-black">
         <LiveKitRoom
           video={isHost}
           audio={isHost}
@@ -131,9 +165,9 @@ export function LiveRoom({ roomId, isHost }: LiveRoomProps) {
           serverUrl={serverUrl}
           connect={true}
           data-lk-theme="default"
-          style={{ height: '100%' }}
+          style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
         >
-          <VideoConference />
+          <HostVideo />
           <RoomAudioRenderer />
           <CustomLeaveButton isHost={isHost} roomId={roomId} />
           {isHost && (
@@ -144,8 +178,8 @@ export function LiveRoom({ roomId, isHost }: LiveRoomProps) {
         </LiveKitRoom>
       </div>
 
-      {/* Chat Area (Right) */}
-      <div className="w-80 border-l border-[rgba(255,255,255,0.1)] bg-[#0E0E0F] flex flex-col relative z-40">
+      {/* Chat Area */}
+      <div className="w-full h-[45vh] md:h-auto md:w-80 border-t md:border-t-0 md:border-l border-[rgba(255,255,255,0.1)] bg-[#0E0E0F] flex flex-col relative z-40">
         <LiveChat roomId={roomId} />
       </div>
     </div>
