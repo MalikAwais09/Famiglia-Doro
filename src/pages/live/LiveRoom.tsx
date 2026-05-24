@@ -72,7 +72,7 @@ export function LiveRoom({ roomId, isHost }: LiveRoomProps) {
   const { session } = useAuth();
   const navigate = useNavigate();
   
-  const serverUrl = import.meta.env.VITE_LIVEKIT_URL;
+  const serverUrl = import.meta.env.VITE_LIVEKIT_URL || 'wss://famiglia-doro-z5smjwx1.livekit.cloud';
 
   // Listen for host ending the room instantly
   useEffect(() => {
