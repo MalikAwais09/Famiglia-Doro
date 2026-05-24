@@ -177,11 +177,6 @@ export function LiveEventWatch() {
                   <Trash2 size={14} className="mr-1" /> Delete Event
                 </Button>
               )}
-              {!(isCreator || hasJoined) && (
-                <Button variant="primary" onClick={() => setLiveAgreementOpen(true)}>
-                  Join Live Event
-                </Button>
-              )}
               <Button
                 variant="secondary"
                 onClick={() => {
