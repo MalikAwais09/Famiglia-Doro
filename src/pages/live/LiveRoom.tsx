@@ -129,6 +129,7 @@ export function LiveRoom({ roomId, isHost }: LiveRoomProps) {
           audio={isHost}
           token={token}
           serverUrl={serverUrl}
+          connect={true}
           data-lk-theme="default"
           style={{ height: '100%' }}
         >
